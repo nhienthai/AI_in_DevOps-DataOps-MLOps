@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MLflow
+mlruns/
+mlflow.db
+mlartifacts/
+
+# Airflow
+logs/
+airflow.db
+airflow.cfg
+webserver_config.py
+
+# Models (large files)
+models/*.pkl
+!models/.gitkeep
+
+# Data
+data/
+*.csv
+
+# Artifacts
+artifacts/
+*.png
+*.jpg
+
+# Reports
+experiment_report.md
+
+# Temporary
+/tmp/
+*.tmp
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db

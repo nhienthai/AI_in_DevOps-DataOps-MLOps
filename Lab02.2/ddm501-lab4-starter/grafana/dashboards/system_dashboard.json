@@ -1,0 +1,115 @@
+{
+  "__comment": "TODO: Create System Metrics Dashboard - See instructions below",
+  "__instructions": [
+    "This dashboard should display system-level metrics for the API.",
+    "",
+    "TODO 1: Create a 'Request Rate' panel",
+    "  - Type: Time series graph",
+    "  - Query: rate(http_requests_total[5m])",
+    "  - Legend: {{method}} {{endpoint}}",
+    "",
+    "TODO 2: Create a 'Request Latency (P95)' panel",
+    "  - Type: Time series graph",
+    "  - Query: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+    "",
+    "TODO 3: Create a 'Error Rate' panel",
+    "  - Type: Stat or Gauge",
+    "  - Query: rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+    "  - Unit: percent",
+    "",
+    "TODO 4: Create a 'Status Code Distribution' panel",
+    "  - Type: Pie chart",
+    "  - Query: sum by (status) (rate(http_requests_total[5m]))",
+    "",
+    "TODO 5: Create a 'Requests by Endpoint' panel",
+    "  - Type: Bar chart or Table",
+    "  - Query: sum by (endpoint) (rate(http_requests_total[5m]))",
+    "",
+    "HOW TO CREATE:",
+    "1. Open Grafana at http://localhost:3000",
+    "2. Login with admin/admin",
+    "3. Create new dashboard",
+    "4. Add panels with the queries above",
+    "5. Export dashboard JSON and save here",
+    "",
+    "Alternatively, build the JSON manually following Grafana dashboard schema."
+  ],
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "TODO: Add Request Rate Panel",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "options": {
+        "content": "## TODO\n\nAdd a Time Series panel with query:\n```\nrate(http_requests_total[5m])\n```",
+        "mode": "markdown"
+      }
+    },
+    {
+      "id": 2,
+      "title": "TODO: Add Latency Panel",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "options": {
+        "content": "## TODO\n\nAdd a Time Series panel with query:\n```\nhistogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))\n```",
+        "mode": "markdown"
+      }
+    },
+    {
+      "id": 3,
+      "title": "TODO: Add Error Rate Panel",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "options": {
+        "content": "## TODO\n\nAdd a Stat panel with query:\n```\nrate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) * 100\n```",
+        "mode": "markdown"
+      }
+    },
+    {
+      "id": 4,
+      "title": "TODO: Add Status Distribution Panel",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "options": {
+        "content": "## TODO\n\nAdd a Pie Chart panel with query:\n```\nsum by (status) (rate(http_requests_total[5m]))\n```",
+        "mode": "markdown"
+      }
+    },
+    {
+      "id": 5,
+      "title": "TODO: Add Endpoints Table",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "options": {
+        "content": "## TODO\n\nAdd a Table panel with query:\n```\nsum by (endpoint) (rate(http_requests_total[5m]))\n```",
+        "mode": "markdown"
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["api", "system", "ddm501"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "System Metrics Dashboard",
+  "uid": "system-metrics",
+  "version": 1,
+  "weekStart": ""
+}
