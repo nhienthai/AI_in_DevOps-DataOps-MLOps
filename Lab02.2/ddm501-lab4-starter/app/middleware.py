@@ -42,28 +42,32 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             The HTTP response
         """
         start_time = time.perf_counter()
-        response = await call_next(request)
-        duration = time.perf_counter() - start_time
+        status = "500"
 
-        route = request.scope.get("route")
-        endpoint = getattr(route, "path", request.url.path)
-        method = request.method
-        status = str(response.status_code)
+        try:
+            response = await call_next(request)
+            status = str(response.status_code)
+            return response
+        finally:
+            # Record failures raised by downstream handlers as well as normal
+            # responses. Previously an exception bypassed both HTTP metrics.
+            duration = time.perf_counter() - start_time
+            route = request.scope.get("route")
+            endpoint = getattr(route, "path", request.url.path)
+            method = request.method
 
-        if REQUEST_COUNT is not None:
-            REQUEST_COUNT.labels(
-                method=method,
-                endpoint=endpoint,
-                status=status,
-            ).inc()
+            if REQUEST_COUNT is not None:
+                REQUEST_COUNT.labels(
+                    method=method,
+                    endpoint=endpoint,
+                    status=status,
+                ).inc()
 
-        if REQUEST_LATENCY is not None:
-            REQUEST_LATENCY.labels(
-                method=method,
-                endpoint=endpoint,
-            ).observe(duration)
-
-        return response
+            if REQUEST_LATENCY is not None:
+                REQUEST_LATENCY.labels(
+                    method=method,
+                    endpoint=endpoint,
+                ).observe(duration)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

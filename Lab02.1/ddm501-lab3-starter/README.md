@@ -312,7 +312,7 @@ Changed to `/data/`.
 | --- | --- | --- |
 | Test suite (unit / integration / data / model) | `tests/` | 278 passing |
 | CI pipeline | `/.github/workflows/lab3-ci.yml` | lint → type → test(3.10, 3.11) → build |
-| CD pipeline | `.github/workflows/cd.yml` | tag → Docker Hub + GHCR → staging → prod |
+| CD pipeline | `/.github/workflows/lab3-cd.yml` | tag → Docker Hub + GHCR → staging → prod |
 | Code quality setup | `.pre-commit-config.yaml`, `.flake8`, `pyproject.toml` | black · isort · flake8 · mypy clean |
 | Coverage report | `htmlcov/` (CI artifact `coverage-report-py3.10`) | 100 % (≥ 80 % required) |
 | Testing strategy | `docs/TESTING_STRATEGY.md` | |

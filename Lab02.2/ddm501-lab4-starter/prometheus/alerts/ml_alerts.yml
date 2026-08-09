@@ -13,7 +13,12 @@ groups:
 
       - alert: PredictionLatencyHigh
         expr: |
-          histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m])) > 0.1
+          histogram_quantile(
+            0.95,
+            sum by (le, model_version) (
+              rate(ml_prediction_duration_seconds_bucket[5m])
+            )
+          ) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -22,7 +27,7 @@ groups:
           description: "P95 prediction latency is {{ $value }}s (threshold: 0.1s)"
 
       - alert: LowPredictionVolume
-        expr: rate(ml_predictions_total[5m]) < 0.1
+        expr: sum by (model_version) (rate(ml_predictions_total[5m])) < 0.1
         for: 15m
         labels:
           severity: warning
@@ -33,8 +38,16 @@ groups:
       - alert: PredictionDistributionAnomaly
         expr: |
           abs(
-            histogram_quantile(0.5, rate(ml_prediction_value_bucket[1h])) -
-            histogram_quantile(0.5, rate(ml_prediction_value_bucket[1h] offset 24h))
+            histogram_quantile(
+              0.5,
+              sum by (le, model_version) (rate(ml_prediction_value_bucket[1h]))
+            ) -
+            histogram_quantile(
+              0.5,
+              sum by (le, model_version) (
+                rate(ml_prediction_value_bucket[1h] offset 24h)
+              )
+            )
           ) > 0.5
         for: 30m
         labels:
@@ -45,8 +58,12 @@ groups:
 
       - alert: HighPredictionErrorRate
         expr: |
-          rate(ml_prediction_errors_total[5m])
-          / clamp_min(rate(ml_predictions_total[5m]), 0.000001) > 0.05
+          sum by (model_version) (rate(ml_prediction_errors_total[5m]))
+          / clamp_min(
+              sum by (model_version) (rate(ml_predictions_total[5m]))
+              + sum by (model_version) (rate(ml_prediction_errors_total[5m])),
+              0.000001
+            ) > 0.05
         for: 5m
         labels:
           severity: critical
@@ -66,10 +83,19 @@ groups:
       - alert: ExtremePredictionsHigh
         expr: |
           (
-            rate(ml_prediction_value_bucket{le="1.5"}[1h]) +
-            rate(ml_prediction_value_bucket{le="5.0"}[1h]) -
-            rate(ml_prediction_value_bucket{le="4.5"}[1h])
-          ) / clamp_min(rate(ml_prediction_value_count[1h]), 0.000001) > 0.3
+            sum by (model_version) (
+              rate(ml_prediction_value_bucket{le="1.5"}[1h])
+            ) +
+            sum by (model_version) (
+              rate(ml_prediction_value_bucket{le="5.0"}[1h])
+            ) -
+            sum by (model_version) (
+              rate(ml_prediction_value_bucket{le="4.5"}[1h])
+            )
+          ) / clamp_min(
+            sum by (model_version) (rate(ml_prediction_value_count[1h])),
+            0.000001
+          ) > 0.3
         for: 1h
         labels:
           severity: warning
