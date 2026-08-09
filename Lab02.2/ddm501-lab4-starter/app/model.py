@@ -56,38 +56,29 @@ class MovieRatingModel:
             with open(self.model_path, "rb") as f:
                 self.model = pickle.load(f)
             logger.info(f"Model loaded successfully from {self.model_path}")
-            
-            # TODO 1: Update model metrics after loading
-            # Set MODEL_LOADED gauge to 1
-            # if MODEL_LOADED is not None:
-            #     MODEL_LOADED.set(1)
-            
-            # TODO 2: Record the reload timestamp
-            # if MODEL_LAST_RELOAD is not None:
-            #     MODEL_LAST_RELOAD.set(time.time())
-            
-            # TODO 3: Set model info
-            # if MODEL_INFO is not None:
-            #     MODEL_INFO.info({
-            #         'version': self.version,
-            #         'type': 'SVD',
-            #         'path': self.model_path
-            #     })
-            
+
+            if MODEL_LOADED is not None:
+                MODEL_LOADED.set(1)
+            if MODEL_LAST_RELOAD is not None:
+                MODEL_LAST_RELOAD.set(time.time())
+            if MODEL_INFO is not None:
+                MODEL_INFO.info({
+                    "version": self.version,
+                    "type": "SVD",
+                    "path": self.model_path,
+                })
+
         except FileNotFoundError:
             logger.error(f"Model file not found: {self.model_path}")
-            
-            # TODO 4: Set MODEL_LOADED to 0 on failure
-            # if MODEL_LOADED is not None:
-            #     MODEL_LOADED.set(0)
-            
+
+            if MODEL_LOADED is not None:
+                MODEL_LOADED.set(0)
             raise
         except Exception as e:
             logger.error(f"Error loading model: {e}")
-            
-            # if MODEL_LOADED is not None:
-            #     MODEL_LOADED.set(0)
-            
+
+            if MODEL_LOADED is not None:
+                MODEL_LOADED.set(0)
             raise
     
     def predict(self, user_id: str, movie_id: str) -> float:
@@ -104,8 +95,7 @@ class MovieRatingModel:
         if self.model is None:
             raise RuntimeError("Model not loaded")
         
-        # TODO 5: Record start time for latency measurement
-        start_time = time.time()
+        start_time = time.perf_counter()
         
         try:
             # Make prediction
@@ -114,40 +104,34 @@ class MovieRatingModel:
             
             # Clip to valid range
             rating = max(MIN_RATING, min(MAX_RATING, rating))
-            
-            # TODO 6: Calculate duration and record metrics
-            duration = time.time() - start_time
-            
-            # Record prediction count
-            # if PREDICTION_COUNT is not None:
-            #     PREDICTION_COUNT.labels(model_version=self.version).inc()
-            
-            # TODO 7: Record prediction latency
-            # if PREDICTION_LATENCY is not None:
-            #     PREDICTION_LATENCY.labels(model_version=self.version).observe(duration)
-            
-            # TODO 8: Record prediction value distribution
-            # if PREDICTION_VALUE is not None:
-            #     PREDICTION_VALUE.labels(model_version=self.version).observe(rating)
+
+            duration = time.perf_counter() - start_time
+
+            if PREDICTION_COUNT is not None:
+                PREDICTION_COUNT.labels(model_version=self.version).inc()
+
+            if PREDICTION_LATENCY is not None:
+                PREDICTION_LATENCY.labels(model_version=self.version).observe(duration)
+
+            if PREDICTION_VALUE is not None:
+                PREDICTION_VALUE.labels(model_version=self.version).observe(rating)
             
             return rating
             
         except ValueError as e:
-            # TODO 9: Record validation errors
-            # if PREDICTION_ERRORS is not None:
-            #     PREDICTION_ERRORS.labels(
-            #         error_type='validation_error',
-            #         model_version=self.version
-            #     ).inc()
+            if PREDICTION_ERRORS is not None:
+                PREDICTION_ERRORS.labels(
+                    error_type="validation_error",
+                    model_version=self.version,
+                ).inc()
             raise
             
         except Exception as e:
-            # TODO 10: Record unknown errors
-            # if PREDICTION_ERRORS is not None:
-            #     PREDICTION_ERRORS.labels(
-            #         error_type='unknown_error',
-            #         model_version=self.version
-            #     ).inc()
+            if PREDICTION_ERRORS is not None:
+                PREDICTION_ERRORS.labels(
+                    error_type="unknown_error",
+                    model_version=self.version,
+                ).inc()
             raise
     
     def predict_batch(self, pairs: List[Tuple[str, str]]) -> List[float]:
@@ -163,9 +147,8 @@ class MovieRatingModel:
         if self.model is None:
             raise RuntimeError("Model not loaded")
         
-        # TODO 11 (BONUS): Record batch size
-        # if BATCH_SIZE is not None:
-        #     BATCH_SIZE.observe(len(pairs))
+        if BATCH_SIZE is not None:
+            BATCH_SIZE.observe(len(pairs))
         
         return [self.predict(user_id, movie_id) for user_id, movie_id in pairs]
     

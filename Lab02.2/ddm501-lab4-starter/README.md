@@ -1,172 +1,180 @@
 # Lab 4: Monitoring & Production Deployment
 
-## Overview
+A production-style movie rating API with Prometheus metrics, Grafana dashboards, alert rules, and a load-testing script. This lab extends the movie-rating model from the earlier labs and adds the observability layer used in a real deployment.
 
-Implement comprehensive monitoring and observability for the movie rating prediction system using Prometheus for metrics collection and Grafana for visualization.
+## What is included
 
-## Project Structure
+- FastAPI API with `/predict`, `/predict/batch`, `/health`, `/metrics`, and `/model/info`
+- Prometheus metrics for HTTP traffic, model health, prediction latency, and prediction errors
+- Grafana dashboards for system metrics and ML metrics
+- Prometheus alert rules for API health and model health
+- A load-testing script to generate traffic and populate the dashboards
 
-```
+## Project structure
+
+```text
 ddm501-lab4-starter/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py             # FastAPI application with metrics
-│   ├── model.py            # ML model with instrumentation
-│   ├── schemas.py          # Pydantic schemas
-│   ├── config.py           # Configuration
-│   ├── metrics.py          # Prometheus metrics (TODO)
-│   └── middleware.py       # Metrics middleware (TODO)
+│   ├── main.py
+│   ├── model.py
+│   ├── metrics.py
+│   ├── middleware.py
+│   ├── config.py
+│   └── schemas.py
 ├── prometheus/
-│   ├── prometheus.yml      # Prometheus config (TODO)
+│   ├── prometheus.yml
 │   └── alerts/
-│       ├── api_alerts.yml  # API alerting rules (TODO)
-│       └── ml_alerts.yml   # ML alerting rules (TODO)
+│       ├── api_alerts.yml
+│       └── ml_alerts.yml
 ├── grafana/
 │   ├── provisioning/
 │   │   ├── datasources/
-│   │   │   └── prometheus.yml  # Data source config
+│   │   │   └── prometheus.yml
 │   │   └── dashboards/
-│   │       └── dashboards.yml  # Dashboard provisioning
+│   │       └── dashboards.yml
 │   └── dashboards/
-│       ├── system_dashboard.json   # System metrics (TODO)
-│       └── ml_dashboard.json       # ML metrics (TODO)
+│       ├── system_dashboard.json
+│       └── ml_dashboard.json
 ├── scripts/
-│   ├── train_model.py      # Model training
-│   └── load_test.py        # Load testing script (TODO)
-├── tests/
-│   └── test_metrics.py     # Metrics tests
-├── models/                 # Saved models
-├── docker-compose.yml      # Full stack deployment (TODO)
+│   ├── train_model.py
+│   └── load_test.py
+├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
 └── README.md
 ```
 
-## Quick Start
+## Prerequisites
 
-### 1. Clone and Setup
+- Python 3.13 for the local Windows venv, or Docker for the containerized stack
+- Docker and Docker Compose
+- About 4 GB free disk space for the monitoring containers
+- A trained model file at `models/svd_model.pkl`
+
+## Local setup
+
+Create a virtual environment and install the local dependencies:
 
 ```bash
-unzip ddm501-lab4-starter.zip
 cd ddm501-lab4-starter
-
-# Create virtual environment
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-
-# Install dependencies
+venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Train Model (if not exists)
+The local pin set is chosen to install cleanly on Windows Python 3.13. The Docker image uses Python 3.10-slim and the same application code.
+
+## Model handoff from earlier labs
+
+This lab does not train a new model by itself. It loads the movie-rating model
+from `models/svd_model.pkl`, so the file must come from a previous training run
+in Lab01.1 or from `python scripts/train_model.py` in this lab.
+
+The practical workflow is:
+
+1. Train the model in Lab01.1 or Lab02.2.
+2. Copy the resulting `svd_model.pkl` into this lab's `models/` folder.
+3. Start the API from this lab's root directory so `app.main` can be imported.
+
+If the model file is missing, train it first:
 
 ```bash
 python scripts/train_model.py
 ```
 
-### 3. Run API Locally
+## Run the API
+
+Start the API locally:
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 4. Start Full Monitoring Stack
+Useful endpoints:
+
+- `http://localhost:8000/health`
+- `http://localhost:8000/metrics`
+- `http://localhost:8000/docs`
+
+## Run the monitoring stack
+
+Start the full stack with Prometheus and Grafana:
 
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
-### 5. Access Services
+Services:
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| API | http://localhost:8000 | - |
-| API Docs | http://localhost:8000/docs | - |
-| Metrics | http://localhost:8000/metrics | - |
-| Prometheus | http://localhost:9090 | - |
-| Grafana | http://localhost:3000 | admin/admin |
+| Service | URL |
+|---|---|
+| API | http://localhost:8000 |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
 
-## TODO Tasks
+Grafana uses the default credentials `admin` / `admin`.
 
-Complete the following files:
+Stop everything with:
 
-### Metrics Implementation
-- [ ] `app/metrics.py` - Define Prometheus metrics
-- [ ] `app/middleware.py` - Implement metrics middleware
-- [ ] Update `app/model.py` - Add ML metrics instrumentation
-
-### Prometheus Configuration
-- [ ] `prometheus/prometheus.yml` - Configure scrape targets
-- [ ] `prometheus/alerts/api_alerts.yml` - API alerting rules
-- [ ] `prometheus/alerts/ml_alerts.yml` - ML-specific alerts
-
-### Grafana Dashboards
-- [ ] `grafana/dashboards/system_dashboard.json` - System metrics dashboard
-- [ ] `grafana/dashboards/ml_dashboard.json` - ML metrics dashboard
-
-### Infrastructure
-- [ ] `docker-compose.yml` - Add Prometheus and Grafana services
-- [ ] `scripts/load_test.py` - Implement load testing
-
-## Metrics to Implement
-
-### Application Metrics
-| Metric | Type | Description |
-|--------|------|-------------|
-| `http_requests_total` | Counter | Total HTTP requests |
-| `http_request_duration_seconds` | Histogram | Request latency |
-
-### ML Metrics
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ml_predictions_total` | Counter | Total predictions |
-| `ml_prediction_duration_seconds` | Histogram | Prediction latency |
-| `ml_prediction_value` | Histogram | Prediction distribution |
-| `ml_model_loaded` | Gauge | Model status |
-| `ml_prediction_errors_total` | Counter | Prediction errors |
-
-## Alert Rules to Implement
-
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| HighErrorRate | Error rate > 10% | Critical |
-| HighLatency | P95 latency > 1s | Warning |
-| ModelNotLoaded | Model status = 0 | Critical |
-| PredictionLatencyHigh | P95 > 100ms | Warning |
-| LowPredictionVolume | Rate < 0.1/s | Warning |
-
-## Useful PromQL Queries
-
-```promql
-# Request rate
-rate(http_requests_total[5m])
-
-# Error rate percentage
-rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100
-
-# P95 latency
-histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
-
-# Prediction rate
-rate(ml_predictions_total[5m])
-
-# Average prediction value
-histogram_quantile(0.5, rate(ml_prediction_value_bucket[5m]))
+```bash
+docker compose down
 ```
 
-## Grading Rubric
+## Load testing
 
-| Criteria | Weight |
-|----------|--------|
-| Application Metrics | 25% |
-| Monitoring Stack | 25% |
-| Dashboards & Alerts | 30% |
-| Documentation | 20% |
+Run a basic load test against the API:
 
-## Submission
+```bash
+python scripts/load_test.py --duration 60 --workers 10
+```
 
-1. Complete all TODO items
-2. Take screenshots of Grafana dashboards with data
-3. Run load test and capture metrics
-4. Push to GitHub
-5. Submit repository link
+Batch mode:
+
+```bash
+python scripts/load_test.py --duration 60 --workers 10 --batch
+```
+
+Spike test:
+
+```bash
+python scripts/load_test.py --spike --workers 10
+```
+
+## Metrics and dashboards
+
+The API exports these metrics:
+
+- `http_requests_total`
+- `http_request_duration_seconds`
+- `ml_predictions_total`
+- `ml_prediction_duration_seconds`
+- `ml_prediction_value`
+- `ml_prediction_errors_total`
+- `ml_model_loaded`
+- `ml_model_info`
+- `ml_model_last_reload_timestamp`
+- `ml_batch_prediction_size`
+
+Prometheus scrapes the API every 10 seconds and loads alert rules from `prometheus/alerts`.
+
+Grafana auto-loads the dashboards from `grafana/dashboards`.
+
+## Recommended workflow
+
+1. Create the venv and install dependencies.
+2. Train the model if `models/svd_model.pkl` is missing.
+3. Start `docker compose up -d --build`.
+4. Open Grafana and confirm the dashboards are populated.
+5. Run the load test to generate traffic and verify the charts.
+
+## Troubleshooting
+
+- If the API returns `503`, check that `models/svd_model.pkl` exists.
+- If you see `ModuleNotFoundError: No module named 'app'`, run the command
+	from `Lab02.2/ddm501-lab4-starter` or use `python -m uvicorn app.main:app --app-dir .`.
+- If the Error Rate panel shows `No data`, that usually means there were no 5xx
+	responses in the selected time range. Generate some requests, or trigger an
+	error and refresh the panel.
+- If Prometheus shows no targets, confirm the API container is running and that `prometheus.yml` points to `api:8000`.
+- If Grafana shows empty dashboards, verify that the Prometheus datasource has loaded and that the stack was started with `docker compose up -d --build`.
+- If local installation fails on Python 3.13, recreate the venv with the bundled requirements in this folder.

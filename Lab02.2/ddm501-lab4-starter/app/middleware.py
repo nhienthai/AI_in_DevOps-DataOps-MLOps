@@ -41,44 +41,28 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         Returns:
             The HTTP response
         """
-        # TODO 1: Record the start time
-        # start_time = time.time()
-        
-        # TODO 2: Call the next handler to get the response
-        # response = await call_next(request)
-        
-        # TODO 3: Calculate the duration
-        # duration = time.time() - start_time
-        
-        # TODO 4: Extract request information
-        # endpoint = request.url.path
-        # method = request.method
-        # status = response.status_code
-        
-        # TODO 5: Record the request count metric
-        # Only record if REQUEST_COUNT is defined
-        # if REQUEST_COUNT is not None:
-        #     REQUEST_COUNT.labels(
-        #         method=method,
-        #         endpoint=endpoint,
-        #         status=status
-        #     ).inc()
-        
-        # TODO 6: Record the request latency metric
-        # Only record if REQUEST_LATENCY is defined
-        # if REQUEST_LATENCY is not None:
-        #     REQUEST_LATENCY.labels(
-        #         method=method,
-        #         endpoint=endpoint
-        #     ).observe(duration)
-        
-        # TODO 7: Return the response
-        # return response
-        
-        # =================================================================
-        # Placeholder implementation - replace with your code above
-        # =================================================================
+        start_time = time.perf_counter()
         response = await call_next(request)
+        duration = time.perf_counter() - start_time
+
+        route = request.scope.get("route")
+        endpoint = getattr(route, "path", request.url.path)
+        method = request.method
+        status = str(response.status_code)
+
+        if REQUEST_COUNT is not None:
+            REQUEST_COUNT.labels(
+                method=method,
+                endpoint=endpoint,
+                status=status,
+            ).inc()
+
+        if REQUEST_LATENCY is not None:
+            REQUEST_LATENCY.labels(
+                method=method,
+                endpoint=endpoint,
+            ).observe(duration)
+
         return response
 
 
