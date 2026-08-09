@@ -254,6 +254,13 @@ jobs:
     needs: [lint, type-check, test, build]
     if: always()
 
+    # This job never checks the repo out, so the workflow-level
+    # working-directory (the lab folder) would not exist and bash would fail to
+    # start - masking the very failure this job exists to report.
+    defaults:
+      run:
+        working-directory: .
+
     steps:
       - name: Fail if any job failed
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
