@@ -94,7 +94,10 @@ jobs:
           pip install -r /tmp/requirements-typecheck.txt
           # pandas-stubs is pinned: it is the type checker's view of pandas, so
           # an unpinned release can turn the build red with no code change.
-          pip install mypy==1.8.0 types-requests pandas-stubs==3.0.5.260730
+          # The pin must also install on this job's Python (3.10, the minimum
+          # this project supports) - pandas-stubs 3.x requires >= 3.11, so 2.3.x
+          # is the newest usable line here.
+          pip install mypy==1.8.0 types-requests pandas-stubs==2.3.3.260113
 
       - name: Run mypy
         run: mypy app/ training/ scripts/ --ignore-missing-imports
