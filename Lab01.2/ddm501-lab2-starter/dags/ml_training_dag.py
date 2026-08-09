@@ -73,8 +73,19 @@ def load_data_task(**context):
     print("Loading data...")
     trainset, testset, stats = load_and_split()
     
-    # Save data to temporary files
-    tmp_dir = '/tmp/airflow_ml_pipeline'
+    # Isolate files by DAG run. A scheduled run can overlap a manually
+    # triggered run; sharing one directory would let one run overwrite or
+    # delete another run's pickles while they are still being consumed.
+    dag_run = context.get('dag_run')
+    run_id = getattr(dag_run, 'run_id', None) or context.get('run_id')
+    if not run_id:
+        raise ValueError("No Airflow run_id available for the working directory")
+
+    safe_run_id = ''.join(
+        char if char.isalnum() or char in '._-' else '_'
+        for char in run_id
+    )
+    tmp_dir = os.path.join('/tmp/airflow_ml_pipeline', safe_run_id)
     os.makedirs(tmp_dir, exist_ok=True)
     
     with open(f'{tmp_dir}/trainset.pkl', 'wb') as f:
@@ -146,7 +157,7 @@ def preprocess_data_task(**context):
 # sweep (see experiment_report.md), not the library defaults.
 TRAINING_CONFIG = {
     "model_type": "svd",
-    "n_factors": 100,
+    "n_factors": 50,
     "n_epochs": 20,
 }
 

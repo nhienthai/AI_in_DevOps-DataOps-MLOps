@@ -47,11 +47,11 @@ Apache Airflow.
 | | |
 |---|---|
 | Best model | **SVD**, `n_factors=50, n_epochs=20, lr_all=0.005, reg_all=0.02` |
-| RMSE | **0.9342** |
-| MAE | 0.7363 |
-| Training time | 0.14 s |
+| RMSE | **0.9334** |
+| MAE | 0.7356 |
+| Training time | 0.21 s |
 
-SVD beat NMF by 9.3% RMSE at each family's best setting. Full analysis in
+SVD beat NMF by 9.2% RMSE at each family's best setting. Full analysis in
 [experiment_report.md](experiment_report.md).
 
 ---
@@ -197,7 +197,9 @@ useless.
 
 `coverage` is worth watching — it is the share of test pairs the model actually
 scored. Surprise silently falls back to the global mean for cold-start pairs,
-which flatters RMSE. All runs here report 1.000, so no score is inflated.
+which flatters RMSE. The four SVD runs reached 1.0000 coverage; KNN/NMF ranged
+from 0.9971 to 0.9982 (36–58 fallback predictions), so their RMSE is very
+slightly flattered. See the experiment report for the per-family breakdown.
 
 ### Experiments
 
@@ -240,9 +242,11 @@ model rather than just a database row.
 | `skip_registration` | No-op branch |
 | `cleanup` | Deletes the `/tmp` working directory (`trigger_rule='none_failed'`) |
 
-Data moves between tasks as pickles in a shared `/tmp` directory, with only the
-path and small scalars going through XCom. XCom values are stored in the Airflow
-metadata database, so pushing a 5 MB trainset through it would bloat the DB.
+Data moves between tasks as pickles in a run-specific directory under `/tmp`,
+with only the path and small scalars going through XCom. The `run_id` namespace
+prevents scheduled and manual runs from overwriting each other's files. XCom
+values are stored in the Airflow metadata database, so pushing a 5 MB trainset
+through it would bloat the DB.
 
 A failed validation stops the DAG rather than training anyway — a model trained
 on data that failed its checks is worse than no model, because the run still
@@ -319,6 +323,6 @@ The `MLFLOW_TRACKING_URI` matters: without it `gc` cannot resolve the
 - [x] `experiments/run_experiments.py` — 9-configuration sweep
 - [x] `docker-compose.yml` — MLflow + Airflow services
 - [x] Experiment report comparing 9 runs with analysis
-- [ ] MLflow UI screenshots — 5 of 12 captured, see [docs/screenshots/](docs/screenshots/)
+- [x] MLflow/Airflow UI screenshots — all 12 captured, see [docs/screenshots/](docs/screenshots/)
 - [x] Bonus: extra metrics (MSE, MAPE, coverage, training time), cold-start
       diagnostics, `load_registered_model()`, stage auto-archiving

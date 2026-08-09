@@ -29,6 +29,13 @@ them is mechanical: first capture → `01`, second → `02`, and so on.
 | 3 | `03-mlflow-chart-mse-rmse-manual.png` | `mse` and `rmse_manual` | `rmse_manual` matches `rmse` bar for bar — an independent recomputation of the metric agreeing with Surprise's own. |
 | 4 | `04-mlflow-chart-mape-npredictions.png` | `mape` and `n_predictions` | MAPE 29.8–37.3%. `n_predictions` is 20 000 for every run — proof all nine were scored on the *same* test split. |
 | 5 | `05-mlflow-chart-npredictions-nimpossible.png` | `n_predictions` and `n_impossible` | 4 SVD runs have 0 cold-start fallbacks; KNN/NMF have 36, one KNN has 58. |
+| 6 | `06-mlflow-table-comparison.png` | Table view with `rmse`, `mae`, `model_type`, `n_epochs`, and `n_factors` | Shows parameters and metrics on the same row for all 9 runs, sorted by RMSE. |
+| 7 | `07-mlflow-run-detail.png` | Best-run detail page | Shows the complete parameter and metric sets for SVD `n_factors=50` (RMSE 0.9334). |
+| 8 | `08-mlflow-run-artifacts.png` | Expanded `model/` and `plots/` folders | Proves the run logged its model pickle and both evaluation plots. |
+| 9 | `09-mlflow-model-registry.png` | `movie-rating-model` registry entry | Version 3 is in Production and the previous versions were automatically archived. |
+| 10 | `10-mlflow-experiment-list.png` | Experiments sidebar | Shows `movie-rating-prediction` and `hyperparameter-tuning` alongside the default experiment. |
+| 11 | `11-airflow-dag-graph.png` | Airflow Graph tab | Shows the complete dependency chain and the registration/skip branch with successful task states. |
+| 12 | `12-airflow-dag-runs.png` | Airflow Grid tab | Shows the `@weekly` schedule and two successful runs (scheduled and manual). |
 
 ### One caveat on reading these charts
 
@@ -52,14 +59,13 @@ The same rounding once put a wrong sentence into `experiment_report.md` —
 
 ---
 
-## Still to capture
+## Rubric coverage
 
-The five above are all the same view. The rubric also credits parameter
-logging, artifacts and the model registry, and none of those appear in a chart.
-Add these before submitting:
+The chart images establish metric comparison; the seven additional images cover
+the rubric items that a chart alone cannot prove:
 
-| # | File to add | Where | Why it is needed |
-|--:|-------------|-------|------------------|
+| # | File | Where | Why it is needed |
+|--:|------|-------|------------------|
 | 6 | `06-mlflow-table-comparison.png` | `hyperparameter-tuning` → **Table** tab, show the params columns | **The single most important shot.** It is the only view showing hyperparameters and metrics on the same row — the point of experiment tracking. Charts show metrics only. |
 | 7 | `07-mlflow-run-detail.png` | Click the best run → its detail page | Parameters (5%) and metrics (5%) on the rubric, in one frame. |
 | 8 | `08-mlflow-run-artifacts.png` | Same run → **Artifacts** tab, expand `model/` and `plots/` | Artifacts (4%). Shows `model_svd_*.pkl` plus both PNGs. |
@@ -93,7 +99,7 @@ without duplicating the nine runs already in the UI:
 python -m experiments.run_experiments --report-only
 ```
 
-### Tips for the remaining shots
+### Reproducing the screenshots
 
 - On the **Table** tab, use the columns selector to show `model_type`,
   `n_factors`, `n_epochs`, `rmse`, `mae`. The default column set hides params.
