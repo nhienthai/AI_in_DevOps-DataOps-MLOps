@@ -45,8 +45,8 @@ groups:
 
       - alert: HighPredictionErrorRate
         expr: |
-          rate(ml_prediction_errors_total[5m])
-          / clamp_min(rate(ml_predictions_total[5m]), 0.000001) > 0.05
+          sum(rate(ml_prediction_errors_total[5m])) by (model_version)
+          / clamp_min(sum(rate(ml_predictions_total[5m])) by (model_version), 0.000001) > 0.05
         for: 5m
         labels:
           severity: critical

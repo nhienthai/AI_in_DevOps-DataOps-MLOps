@@ -10,6 +10,7 @@ This application exposes:
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from app.metrics import count_implemented_metrics, BATCH_SIZE
 import logging
 
 from app.config import (
@@ -189,6 +190,9 @@ async def predict_batch(request: BatchPredictionRequest):
         total_latency = 0
         
         for item in request.predictions:
+            if BATCH_SIZE is not None:
+               BATCH_SIZE.observe(len(request.predictions))
+               
             rating, latency_ms = model.predict_with_latency(
                 item.user_id, 
                 item.movie_id

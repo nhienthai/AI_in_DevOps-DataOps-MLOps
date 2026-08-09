@@ -63,7 +63,7 @@
       "id": 4,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_prediction_errors_total[5m]) / clamp_min(rate(ml_predictions_total[5m]), 0.000001)", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "sum(rate(ml_prediction_errors_total[5m])) by (model_version) / clamp_min(sum(rate(ml_predictions_total[5m])) by (model_version), 0.000001)", "refId": "A" }
       ],
       "title": "Error Rate",
       "type": "stat"
@@ -125,7 +125,7 @@
       "id": 9,
       "options": { "showHeader": true },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "ml_model_info", "format": "table", "instant": true, "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "ml_model_info_info", "format": "table", "instant": true, "refId": "A" }
       ],
       "title": "Model Info",
       "transformations": [
