@@ -78,7 +78,10 @@ def validate_completeness(frame: pd.DataFrame, required_columns: Sequence[str]) 
         if n_null:
             report.add(f"Column '{column}' has {n_null} missing value(s)")
         if frame[column].dtype.kind == "O":
-            n_blank = int(frame[column].astype(str).str.strip().eq("").sum())
+            # map() rather than the .str accessor: pandas-stubs mistypes
+            # `.astype(str).str` and rejects the chained call, while this form
+            # is equally clear and type-checks cleanly.
+            n_blank = int(frame[column].map(lambda value: str(value).strip() == "").sum())
             if n_blank:
                 report.add(f"Column '{column}' has {n_blank} blank value(s)")
     return report

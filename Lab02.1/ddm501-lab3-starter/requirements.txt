@@ -9,7 +9,10 @@ scipy==1.11.4
 
 # Machine Learning
 scikit-learn==1.3.2
-# 1.1.4 ships prebuilt wheels for CPython 3.10-3.12 (1.1.3 requires a C toolchain)
+# Source-only on PyPI (no wheels for any platform), so installing it compiles a
+# Cython extension and needs a C toolchain: fine on Linux CI and in Docker,
+# impossible on Windows without MSVC Build Tools. scripts/train_model.py has an
+# equivalent NumPy backend for that case - see --backend in the README.
 scikit-surprise==1.1.4
 
 # Validation
