@@ -1,49 +1,5 @@
 {
-  "__comment": "TODO: Create ML Metrics Dashboard - See instructions below",
-  "__instructions": [
-    "This dashboard should display ML-specific metrics for model monitoring.",
-    "",
-    "TODO 1: Create a 'Model Status' panel",
-    "  - Type: Stat",
-    "  - Query: ml_model_loaded",
-    "  - Value mappings: 0 = Not Loaded (red), 1 = Loaded (green)",
-    "",
-    "TODO 2: Create a 'Prediction Rate' panel",
-    "  - Type: Time series graph",
-    "  - Query: rate(ml_predictions_total[5m])",
-    "",
-    "TODO 3: Create a 'Prediction Latency (P95)' panel",
-    "  - Type: Time series graph",
-    "  - Query: histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m]))",
-    "  - Unit: seconds",
-    "",
-    "TODO 4: Create a 'Prediction Value Distribution' panel",
-    "  - Type: Histogram or Heatmap",
-    "  - Query: rate(ml_prediction_value_bucket[5m])",
-    "",
-    "TODO 5: Create an 'Average Prediction' panel",
-    "  - Type: Gauge or Stat",
-    "  - Query: histogram_quantile(0.5, rate(ml_prediction_value_bucket[5m]))",
-    "  - Min: 1, Max: 5",
-    "",
-    "TODO 6: Create a 'Prediction Errors' panel",
-    "  - Type: Time series graph",
-    "  - Query: rate(ml_prediction_errors_total[5m])",
-    "  - Legend: {{error_type}}",
-    "",
-    "TODO 7: Create a 'Model Info' panel",
-    "  - Type: Table",
-    "  - Query: ml_model_info",
-    "",
-    "HOW TO CREATE:",
-    "1. Open Grafana at http://localhost:3000",
-    "2. Create new dashboard",
-    "3. Add panels with the queries above",
-    "4. Export dashboard JSON and save here"
-  ],
-  "annotations": {
-    "list": []
-  },
+  "annotations": { "list": [] },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -52,97 +8,138 @@
   "liveNow": false,
   "panels": [
     {
-      "id": 1,
-      "title": "TODO: Model Status",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": { "color": "red", "text": "Not Loaded" },
+                "1": { "color": "green", "text": "Loaded" }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "options": {
-        "content": "## TODO\n\nAdd a Stat panel:\n```\nml_model_loaded\n```\nWith value mappings for 0/1",
-        "mode": "markdown"
-      }
+      "id": 1,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "ml_model_loaded", "refId": "A" }
+      ],
+      "title": "Model Status",
+      "type": "stat"
     },
     {
-      "id": 2,
-      "title": "TODO: Average Prediction",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "min": 1, "max": 5, "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-      "options": {
-        "content": "## TODO\n\nAdd a Gauge panel:\n```\nhistogram_quantile(0.5, rate(ml_prediction_value_bucket[5m]))\n```\nMin: 1, Max: 5",
-        "mode": "markdown"
-      }
+      "id": 2,
+      "options": { "showThresholdLabels": false, "showThresholdMarkers": true },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.5, rate(ml_prediction_value_bucket[5m]))", "refId": "A" }
+      ],
+      "title": "Average Prediction",
+      "type": "gauge"
     },
     {
-      "id": 3,
-      "title": "TODO: Prediction Rate",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-      "options": {
-        "content": "## TODO\n\nAdd a Stat panel:\n```\nrate(ml_predictions_total[5m])\n```",
-        "mode": "markdown"
-      }
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_predictions_total[5m])", "refId": "A" }
+      ],
+      "title": "Prediction Rate",
+      "type": "stat"
     },
     {
-      "id": 4,
-      "title": "TODO: Error Rate",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-      "options": {
-        "content": "## TODO\n\nAdd a Stat panel:\n```\nrate(ml_prediction_errors_total[5m])\n```",
-        "mode": "markdown"
-      }
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_prediction_errors_total[5m]) / clamp_min(rate(ml_predictions_total[5m]), 0.000001)", "refId": "A" }
+      ],
+      "title": "Error Rate",
+      "type": "stat"
     },
     {
-      "id": 5,
-      "title": "TODO: Prediction Rate Over Time",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-      "options": {
-        "content": "## TODO\n\nAdd a Time Series panel:\n```\nrate(ml_predictions_total[5m])\n```",
-        "mode": "markdown"
-      }
+      "id": 5,
+      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_predictions_total[5m])", "legendFormat": "predictions", "refId": "A" }
+      ],
+      "title": "Prediction Rate Over Time",
+      "type": "timeseries"
     },
     {
-      "id": 6,
-      "title": "TODO: Prediction Latency",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-      "options": {
-        "content": "## TODO\n\nAdd a Time Series panel with multiple quantiles:\n```\nhistogram_quantile(0.50, rate(ml_prediction_duration_seconds_bucket[5m]))\nhistogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m]))\nhistogram_quantile(0.99, rate(ml_prediction_duration_seconds_bucket[5m]))\n```",
-        "mode": "markdown"
-      }
+      "id": 6,
+      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.50, rate(ml_prediction_duration_seconds_bucket[5m]))", "legendFormat": "P50", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m]))", "legendFormat": "P95", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.99, rate(ml_prediction_duration_seconds_bucket[5m]))", "legendFormat": "P99", "refId": "C" }
+      ],
+      "title": "Prediction Latency",
+      "type": "timeseries"
     },
     {
-      "id": 7,
-      "title": "TODO: Prediction Value Distribution",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-      "options": {
-        "content": "## TODO\n\nAdd a Histogram or Heatmap panel:\n```\nrate(ml_prediction_value_bucket[5m])\n```\nOr use sum(increase(ml_prediction_value_bucket[1h])) by (le)",
-        "mode": "markdown"
-      }
+      "id": 7,
+      "options": { "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "single" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_prediction_value_bucket[5m])", "legendFormat": "<= {{le}}", "refId": "A" }
+      ],
+      "title": "Prediction Value Distribution",
+      "type": "histogram"
     },
     {
-      "id": 8,
-      "title": "TODO: Prediction Errors",
-      "type": "text",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-      "options": {
-        "content": "## TODO\n\nAdd a Time Series panel:\n```\nrate(ml_prediction_errors_total[5m])\n```\nGroup by error_type label",
-        "mode": "markdown"
-      }
+      "id": 8,
+      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "single" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_prediction_errors_total[5m])", "legendFormat": "{{error_type}}", "refId": "A" }
+      ],
+      "title": "Prediction Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
+      "id": 9,
+      "options": { "showHeader": true },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "ml_model_info", "format": "table", "instant": true, "refId": "A" }
+      ],
+      "title": "Model Info",
+      "transformations": [
+        { "id": "labelsToFields", "options": {} }
+      ],
+      "type": "table"
     }
   ],
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["ml", "model", "ddm501"],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "",
   "title": "ML Metrics Dashboard",
