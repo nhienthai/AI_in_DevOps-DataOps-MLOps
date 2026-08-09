@@ -39,7 +39,7 @@ green while the service returns 3.53 for every user.
         │  tests/unit/                                          │
         └───────────────────────────────────────────────────────┘
 
-                        278 tests · ~5 s · 99 % coverage of app/
+                    278 tests · 2.4 s in CI · 100 % coverage of app/
 ```
 
 The whole suite runs in about **5 seconds**. That is deliberate: a suite slow
@@ -297,29 +297,39 @@ people to ignore red builds.
 
 ## 5. Coverage
 
+As reported by CI (`Run Tests (py3.10)`, run #9 — see
+[`docs/screenshots/03-ci-coverage-output.png`](screenshots/03-ci-coverage-output.png)):
+
 ```
+---------- coverage: platform linux, python 3.10.20-final-0 ----------
 Name              Stmts   Miss  Cover   Missing
 -----------------------------------------------
 app/__init__.py       1      0   100%
-app/cache.py         71      2    97%   68-69
+app/cache.py         71      0   100%
 app/config.py        20      0   100%
 app/main.py         114      0   100%
 app/metrics.py       24      0   100%
 app/model.py         66      0   100%
 app/schemas.py       76      0   100%
 -----------------------------------------------
-TOTAL               372      2    99%
+TOTAL               372      0   100%
+
+Required test coverage of 80% reached. Total coverage: 100.00%
+========================= 278 passed in 2.41s =========================
 ```
 
-**99 %** of `app/`, against a required minimum of 80 %. The gate is enforced
+**100 %** of `app/`, against a required minimum of 80 %. The gate is enforced
 twice — `fail_under = 80` in `pyproject.toml` and `--cov-fail-under=80` in the
 workflow, so it is visible in the CI log.
 
-The two uncovered lines are the successful Redis-connect path, unreachable
-without a live server. CI runs a Redis service container, so they are covered
-there — the local 99 % is the floor, not the ceiling.
+Run the same suite on a laptop with no Redis and it reports **273 passed, 5
+skipped, 99 %**: `app/cache.py` keeps two uncovered lines, the successful
+Redis-connect path, which no stub can reach. CI supplies a Redis service
+container, and those two lines close. Both numbers are honest — the difference
+*is* the point, and it is why the cache tests skip rather than fail when Redis
+is absent.
 
-Coverage is a *floor*, not a goal. `app/` reaching 99 % says every line runs;
+Coverage is a *floor*, not a goal. `app/` reaching 100 % says every line runs;
 the behavioural and data tests are what say the system is *right*. `training/`
 is intentionally outside the coverage target — it builds artifacts, it does not
 serve them.

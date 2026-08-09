@@ -2,7 +2,7 @@
 
 [![Lab3 CI](https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps/actions/workflows/lab3-ci.yml/badge.svg)](https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps/actions/workflows/lab3-ci.yml)
 ![tests](https://img.shields.io/badge/tests-278%20passed-brightgreen)
-![coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)
+![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue)
 
 Comprehensive testing and CI/CD for the movie rating prediction API carried
@@ -11,13 +11,15 @@ forward from Labs 1 and 2 — including its Redis cache and Prometheus metrics.
 | | |
 | --- | --- |
 | **Tests** | 278 (90 unit · 109 integration · 48 data · 31 behavioural) |
-| **Coverage** | 99 % of `app/` (required: ≥ 80 %) |
-| **Runtime** | ~5 s for the full suite |
+| **Coverage** | **100 %** of `app/` in CI (required: ≥ 80 %) |
+| **Runtime** | ~2.4 s for the full suite in CI |
 | **Model** | SVD collaborative filtering, RMSE 0.944 / MAE 0.745 |
 | **Quality** | black · isort · flake8 · mypy — all clean |
 
-> 5 tests need a live Redis and skip locally; CI runs them against a Redis
-> service container, which also covers the last 2 lines of `app/cache.py`.
+> Locally the suite reports **273 passed, 5 skipped and 99.5 %**: the five
+> skipped tests need a live Redis. CI runs them against a Redis service
+> container, which is what closes the last two lines of `app/cache.py`. Both
+> numbers are real — see [`docs/screenshots/`](docs/screenshots/) for the CI run.
 
 ---
 
@@ -25,7 +27,7 @@ forward from Labs 1 and 2 — including its Redis cache and Prometheus metrics.
 
 ```
 ddm501-lab3-starter/
-├── app/                         # Serving layer (99 % covered)
+├── app/                         # Serving layer (100 % covered in CI)
 │   ├── main.py                  # FastAPI application
 │   ├── model.py                 # ML model wrapper + cold-start detection
 │   ├── schemas.py               # Pydantic schemas
@@ -49,7 +51,8 @@ ddm501-lab3-starter/
 │   ├── train_model.py           # Train + evaluate + persist
 │   └── validate_model.py        # Model quality gate for CI
 ├── docs/
-│   └── TESTING_STRATEGY.md      # Testing strategy document
+│   ├── TESTING_STRATEGY.md      # Testing strategy document
+│   └── screenshots/             # Passing-CI evidence, one note per image
 ├── models/                      # svd_model.pkl, metrics.json, metadata
 ├── .pre-commit-config.yaml      # Hooks, version-pinned to match CI
 ├── .flake8                      # flake8 config (not readable from pyproject)
@@ -119,14 +122,14 @@ imports either one — it just unpickles an object with a `.predict()` method.
 ### 3. Run the tests
 
 ```bash
-pytest tests/ -v                                   # all 189
+pytest tests/ -v                                   # all 278
 pytest tests/ -v --cov=app --cov-report=html       # + coverage → htmlcov/
 pytest tests/ -m "not slow"                        # skip the throughput test
 
-pytest tests/unit/ -v            # 64  — model wrapper, schemas
-pytest tests/integration/ -v     # 46  — API endpoints, error paths
-pytest tests/data/ -v            # 48  — data quality & validators
-pytest tests/model/ -v           # 31  — invariance, directional, robustness
+pytest tests/unit/ -v            # 90   — model wrapper, schemas
+pytest tests/integration/ -v     # 109  — API, cache, metrics
+pytest tests/data/ -v            # 48   — data quality & validators
+pytest tests/model/ -v           # 31   — invariance, directional, robustness
 ```
 
 ### 4. Code quality
@@ -311,8 +314,9 @@ Changed to `/data/`.
 | CI pipeline | `/.github/workflows/lab3-ci.yml` | lint → type → test(3.10, 3.11) → build |
 | CD pipeline | `.github/workflows/cd.yml` | tag → Docker Hub + GHCR → staging → prod |
 | Code quality setup | `.pre-commit-config.yaml`, `.flake8`, `pyproject.toml` | black · isort · flake8 · mypy clean |
-| Coverage report | `htmlcov/` (CI artifact `coverage-report-py3.10`) | 99 % (≥ 80 % required) |
+| Coverage report | `htmlcov/` (CI artifact `coverage-report-py3.10`) | 100 % (≥ 80 % required) |
 | Testing strategy | `docs/TESTING_STRATEGY.md` | |
+| Passing-CI screenshots | [`docs/screenshots/`](docs/screenshots/) | with a note per image |
 | Model quality gate | `scripts/validate_model.py` | RMSE < 1.0, MAE < 0.8 |
 
 ---
@@ -321,7 +325,7 @@ Changed to `/data/`.
 
 | Criteria | Weight | Covered by |
 | --- | --- | --- |
-| Test coverage (unit, integration, data, model) | 30 % | 278 tests, all four levels, 99 % of `app/` |
+| Test coverage (unit, integration, data, model) | 30 % | 278 tests, all four levels, 100 % of `app/` |
 | CI/CD pipeline | 30 % | 5-job CI with matrix + Docker smoke test; tag-driven CD |
 | Code quality | 20 % | pre-commit pinned to CI versions; full type annotations |
 | Documentation | 20 % | `docs/TESTING_STRATEGY.md`, this README, coverage report |
