@@ -5,17 +5,20 @@ This module handles:
 - Finding the best model from experiments
 - Registering models to MLflow Model Registry
 - Managing model versions and stages
-
-TODO: Complete the functions marked with TODO.
 """
 
 import logging
 from typing import Any, Dict, List, Optional
 
 import mlflow
+from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
-from pipeline.config import MLFLOW_EXPERIMENT_NAME
+from pipeline.config import (
+    MLFLOW_EXPERIMENT_NAME,
+    MLFLOW_MODEL_ARTIFACT_PATH,
+    MLFLOW_REGISTERED_MODEL_NAME,
+)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# TODO 1: Implement find_best_run function
+# Finding the best run
 # =============================================================================
 def find_best_run(
     experiment_name: str = MLFLOW_EXPERIMENT_NAME,
@@ -31,237 +34,248 @@ def find_best_run(
     ascending: bool = True
 ) -> Dict[str, Any]:
     """
-    Find the best run from an experiment based on a metric.
-    
-    TODO: Implement this function with the following requirements:
-    
-    1. Get the MLflow client
-    2. Get the experiment by name
-    3. Search runs and order by the specified metric
-    4. Return information about the best run
-    
+    Find the best run in an experiment, ranked by a metric.
+
+    Runs that never logged the metric (a crashed training, or a run that was
+    trained but never evaluated) are excluded by the filter string. Without it
+    MLflow sorts missing values first and "best" would be a run with no score.
+
     Args:
         experiment_name: Name of the MLflow experiment
         metric: Metric to optimize (default: 'rmse')
         ascending: If True, lower is better (default: True for RMSE)
-        
+
     Returns:
-        Dictionary with best run information:
-        {
-            'run_id': str,
-            'metrics': dict,
-            'params': dict,
-            'artifact_uri': str
-        }
-        
+        Dictionary with keys run_id, metrics, params, artifact_uri, run_name.
+
+    Raises:
+        ValueError: The experiment does not exist, or has no run with the metric.
+
     Example:
         best = find_best_run(metric='rmse', ascending=True)
         print(f"Best RMSE: {best['metrics']['rmse']}")
     """
-    # TODO: Implement this function
-    #
-    # Hints:
-    # 1. Create client: client = MlflowClient()
-    # 2. Get experiment: experiment = client.get_experiment_by_name(experiment_name)
-    # 3. Search runs with ordering:
-    #    order = "ASC" if ascending else "DESC"
-    #    runs = client.search_runs(
-    #        experiment_ids=[experiment.experiment_id],
-    #        order_by=[f"metrics.{metric} {order}"],
-    #        max_results=1
-    #    )
-    # 4. Extract info from best_run = runs[0]
-    #
-    # Example structure:
-    # client = MlflowClient()
-    # experiment = client.get_experiment_by_name(experiment_name)
-    # 
-    # if experiment is None:
-    #     raise ValueError(f"Experiment '{experiment_name}' not found")
-    # 
-    # order = "ASC" if ascending else "DESC"
-    # runs = client.search_runs(
-    #     experiment_ids=[experiment.experiment_id],
-    #     order_by=[f"metrics.{metric} {order}"],
-    #     max_results=1
-    # )
-    # 
-    # if not runs:
-    #     raise ValueError(f"No runs found in experiment '{experiment_name}'")
-    # 
-    # best_run = runs[0]
-    # return {
-    #     "run_id": best_run.info.run_id,
-    #     "metrics": best_run.data.metrics,
-    #     "params": best_run.data.params,
-    #     "artifact_uri": best_run.info.artifact_uri,
-    # }
-    
-    pass  # Remove this and implement the function
+    client = MlflowClient()
+    experiment = client.get_experiment_by_name(experiment_name)
+
+    if experiment is None:
+        raise ValueError(
+            f"Experiment '{experiment_name}' not found. "
+            "Run the pipeline or the experiment runner first."
+        )
+
+    order = "ASC" if ascending else "DESC"
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=f"metrics.{metric} > -1e30",  # excludes runs missing the metric
+        order_by=[f"metrics.{metric} {order}"],
+        max_results=1,
+    )
+
+    if not runs:
+        raise ValueError(
+            f"No run in experiment '{experiment_name}' has a '{metric}' metric."
+        )
+
+    best_run = runs[0]
+    logger.info(
+        f"Best run {best_run.info.run_id}: "
+        f"{metric}={best_run.data.metrics.get(metric)}"
+    )
+
+    return {
+        "run_id": best_run.info.run_id,
+        "run_name": best_run.data.tags.get("mlflow.runName", ""),
+        "metrics": best_run.data.metrics,
+        "params": best_run.data.params,
+        "artifact_uri": best_run.info.artifact_uri,
+    }
 
 
 # =============================================================================
-# TODO 2: Implement register_model function
+# Registering a model
 # =============================================================================
+VALID_STAGES = ("None", "Staging", "Production", "Archived")
+
+
 def register_model(
     run_id: str,
     model_name: str,
-    artifact_path: str = "model"
+    artifact_path: str = MLFLOW_MODEL_ARTIFACT_PATH
 ) -> str:
     """
-    Register a model from an MLflow run to the Model Registry.
-    
-    TODO: Implement this function with the following requirements:
-    
-    1. Create the model URI from the run_id
-    2. Register the model using mlflow.register_model()
-    3. Return the model version
-    
+    Register a model from an MLflow run into the Model Registry.
+
     Args:
         run_id: MLflow run ID containing the model
         model_name: Name for the registered model
         artifact_path: Path to the model artifact within the run
-        
+
     Returns:
         Version number of the registered model (as string)
-        
+
+    Raises:
+        ValueError: The run has no artifact at `artifact_path`, so registering
+            would create an empty version that fails at load time.
+
     Example:
         version = register_model(run_id, "movie-rating-model")
         print(f"Registered model version: {version}")
     """
-    # TODO: Implement this function
-    #
-    # Hints:
-    # 1. Model URI format: f"runs:/{run_id}/{artifact_path}"
-    # 2. Use mlflow.register_model(model_uri, model_name)
-    # 3. The result has a 'version' attribute
-    #
-    # Example structure:
-    # model_uri = f"runs:/{run_id}/{artifact_path}"
-    # logger.info(f"Registering model from {model_uri} as '{model_name}'")
-    # 
-    # result = mlflow.register_model(model_uri, model_name)
-    # 
-    # logger.info(f"Model registered: {model_name} version {result.version}")
-    # return result.version
-    
-    pass  # Remove this and implement the function
+    client = MlflowClient()
+
+    # Registering a non-existent path succeeds silently and only breaks later,
+    # when something tries to load the model. Fail here instead.
+    artifacts = [f.path for f in client.list_artifacts(run_id, artifact_path)]
+    if not artifacts:
+        raise ValueError(
+            f"Run {run_id} has no artifacts under '{artifact_path}'. "
+            "Was the model logged during training?"
+        )
+
+    model_uri = f"runs:/{run_id}/{artifact_path}"
+    logger.info(f"Registering model from {model_uri} as '{model_name}'")
+
+    result = mlflow.register_model(model_uri, model_name)
+
+    logger.info(f"Model registered: {model_name} version {result.version}")
+    return str(result.version)
 
 
 # =============================================================================
-# TODO 3: Implement transition_model_stage function
+# Stage transitions
 # =============================================================================
 def transition_model_stage(
     model_name: str,
     version: str,
-    stage: str = "Production"
+    stage: str = "Production",
+    archive_existing: bool = True,
 ) -> None:
     """
-    Transition a model version to a new stage.
-    
-    TODO: Implement this function with the following requirements:
-    
-    1. Create MLflow client
-    2. Transition the model version to the specified stage
-    3. Log the transition
-    
+    Move a model version to a new stage.
+
     Args:
         model_name: Name of the registered model
         version: Version number to transition
-        stage: Target stage ('Staging', 'Production', 'Archived')
-        
-    Valid stages:
-        - 'None': No stage
-        - 'Staging': For testing
-        - 'Production': For production use
-        - 'Archived': Retired models
-        
+        stage: Target stage ('None', 'Staging', 'Production', 'Archived')
+        archive_existing: Archive whatever currently occupies the stage, so
+            exactly one version is ever in Production.
+
+    Raises:
+        ValueError: `stage` is not one of the four MLflow stages.
+
     Example:
         transition_model_stage("movie-rating-model", "1", "Production")
     """
-    # TODO: Implement this function
-    #
-    # Hints:
-    # 1. Create client: client = MlflowClient()
-    # 2. Use client.transition_model_version_stage(name, version, stage)
-    #
-    # Example structure:
-    # client = MlflowClient()
-    # 
-    # logger.info(f"Transitioning {model_name} v{version} to {stage}")
-    # 
-    # client.transition_model_version_stage(
-    #     name=model_name,
-    #     version=version,
-    #     stage=stage
-    # )
-    # 
-    # logger.info(f"Model {model_name} v{version} is now in {stage}")
-    
-    pass  # Remove this and implement the function
+    if stage not in VALID_STAGES:
+        raise ValueError(f"Invalid stage {stage!r}. Valid stages: {list(VALID_STAGES)}")
+
+    client = MlflowClient()
+    logger.info(f"Transitioning {model_name} v{version} to {stage}")
+
+    client.transition_model_version_stage(
+        name=model_name,
+        version=version,
+        stage=stage,
+        archive_existing_versions=archive_existing and stage in ("Staging", "Production"),
+    )
+
+    logger.info(f"Model {model_name} v{version} is now in {stage}")
 
 
 # =============================================================================
-# TODO 4: Implement register_best_model function (combines all above)
+# Find + register + promote
 # =============================================================================
 def register_best_model(
     experiment_name: str = MLFLOW_EXPERIMENT_NAME,
-    model_name: str = "movie-rating-model",
+    model_name: str = MLFLOW_REGISTERED_MODEL_NAME,
     metric: str = "rmse",
-    stage: str = "Production"
+    stage: str = "Production",
+    ascending: bool = True,
 ) -> Dict[str, Any]:
     """
-    Find the best model and register it to the Model Registry.
-    
-    TODO: Implement this function that:
-    
-    1. Finds the best run using find_best_run()
-    2. Registers the model using register_model()
-    3. Transitions to the specified stage using transition_model_stage()
-    4. Returns information about the registered model
-    
+    Find the best run in an experiment and promote its model.
+
     Args:
         experiment_name: Name of the MLflow experiment
         model_name: Name for the registered model
         metric: Metric to optimize (default: 'rmse')
         stage: Stage to transition to (default: 'Production')
-        
+        ascending: True when a lower metric is better (RMSE, MAE)
+
     Returns:
-        Dictionary with registration info:
-        {
-            'run_id': str,
-            'model_name': str,
-            'version': str,
-            'stage': str,
-            'metrics': dict
-        }
-        
+        Dictionary with run_id, model_name, version, stage, metric, params.
+
+    Raises:
+        ValueError: No suitable run exists, or the run has no model artifact.
+
     Example:
         result = register_best_model()
         print(f"Registered {result['model_name']} v{result['version']}")
     """
-    # TODO: Implement this function
-    #
-    # Example structure:
-    # # Find best run
-    # best_run = find_best_run(experiment_name, metric, ascending=True)
-    # logger.info(f"Best run: {best_run['run_id']} with {metric}={best_run['metrics'].get(metric)}")
-    # 
-    # # Register model
-    # version = register_model(best_run['run_id'], model_name)
-    # 
-    # # Transition to stage
-    # transition_model_stage(model_name, version, stage)
-    # 
-    # return {
-    #     "run_id": best_run['run_id'],
-    #     "model_name": model_name,
-    #     "version": version,
-    #     "stage": stage,
-    #     "metrics": best_run['metrics']
-    # }
-    
-    pass  # Remove this and implement the function
+    best_run = find_best_run(experiment_name, metric, ascending=ascending)
+    logger.info(
+        f"Best run: {best_run['run_id']} "
+        f"with {metric}={best_run['metrics'].get(metric)}"
+    )
+
+    version = register_model(best_run["run_id"], model_name)
+    transition_model_stage(model_name, version, stage)
+
+    return {
+        "run_id": best_run["run_id"],
+        "run_name": best_run["run_name"],
+        "model_name": model_name,
+        "version": version,
+        "stage": stage,
+        "metric": metric,
+        "metrics": best_run["metrics"],
+        "params": best_run["params"],
+    }
+
+
+def load_registered_model(
+    model_name: str = MLFLOW_REGISTERED_MODEL_NAME,
+    stage: str = "Production",
+) -> Any:
+    """
+    Download and unpickle the model currently in a given stage.
+
+    Closes the loop on the registry: proves the registered artifact is a usable
+    Surprise model, not just a database row.
+
+    Args:
+        model_name: Name of the registered model
+        stage: Stage to load from
+
+    Returns:
+        The unpickled Surprise model.
+
+    Raises:
+        ValueError: Nothing is registered in that stage.
+    """
+    import pickle
+    from pathlib import Path
+
+    client = MlflowClient()
+    versions = client.get_latest_versions(model_name, stages=[stage])
+    if not versions:
+        raise ValueError(f"No version of '{model_name}' is in stage '{stage}'")
+
+    version = versions[0]
+    local_dir = mlflow.artifacts.download_artifacts(
+        run_id=version.run_id, artifact_path=MLFLOW_MODEL_ARTIFACT_PATH
+    )
+
+    pickles = sorted(Path(local_dir).glob("*.pkl"))
+    if not pickles:
+        raise ValueError(f"No .pkl artifact found for {model_name} v{version.version}")
+
+    with open(pickles[0], "rb") as f:
+        model = pickle.load(f)
+
+    logger.info(f"Loaded {model_name} v{version.version} ({stage}) from {pickles[0].name}")
+    return model
 
 
 # =============================================================================
@@ -366,12 +380,20 @@ if __name__ == "__main__":
     print("Testing Registry Module")
     print("=" * 50)
     
-    # Test helper functions
-    print("\nRegistered models:", list_registered_models())
-    
-    # After implementing TODO functions, test:
-    # result = register_best_model()
-    # print(f"Registered: {result}")
-    
-    print("\nRegistry module loaded successfully.")
-    print("Implement TODO functions and test after running experiments.")
+    import mlflow
+    from pipeline.config import MLFLOW_TRACKING_URI
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+    print("\nRegistered models:")
+    for model in list_registered_models():
+        print(f"  {model['name']}")
+        for v in model["latest_versions"]:
+            print(f"    v{v['version']:>3}  {v['stage']}")
+
+    production = get_production_model(MLFLOW_REGISTERED_MODEL_NAME)
+    print(f"\nCurrent production model: {production}")
+
+    print("\nTo promote the best run of an experiment:")
+    print("  python -c 'from pipeline.registry import register_best_model;"
+          " print(register_best_model())'")

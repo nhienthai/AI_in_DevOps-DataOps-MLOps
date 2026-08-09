@@ -1,7 +1,5 @@
 """
 ML Model wrapper for movie rating prediction.
-
-TODO: Complete the model loading and prediction functions.
 """
 
 import pickle
@@ -16,104 +14,118 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+class ModelNotLoadedError(RuntimeError):
+    """Raised when a prediction is requested before the model is available."""
+
+
 class MovieRatingModel:
     """
     Wrapper class for the movie rating prediction model.
-    
+
     This class handles:
     - Loading the trained model from disk
     - Making single predictions
     - Making batch predictions
     """
-    
+
     def __init__(self, model_path: str = MODEL_PATH):
         """
         Initialize the model wrapper.
-        
+
         Args:
             model_path: Path to the saved model file (.pkl)
         """
         self.model_path = model_path
         self.model = None
         self._load_model()
-    
-    # =========================================================================
-    # TODO 1: Implement _load_model method
-    # =========================================================================
-    # Requirements:
-    # - Load the pickle file from self.model_path
-    # - Store the loaded model in self.model
-    # - Log success message
-    # - Handle FileNotFoundError gracefully
-    #
-    # Hint: Use pickle.load() with 'rb' mode
-    
+
     def _load_model(self) -> None:
-        """Load the trained model from disk."""
-        # TODO: Implement this method
-        # 
-        # try:
-        #     with open(self.model_path, 'rb') as f:
-        #         self.model = ???
-        #     logger.info(f"Model loaded successfully from {self.model_path}")
-        # except FileNotFoundError:
-        #     logger.error(f"Model file not found: {self.model_path}")
-        #     raise
-        pass
-    
-    # =========================================================================
-    # TODO 2: Implement predict method
-    # =========================================================================
-    # Requirements:
-    # - Use self.model.predict(user_id, movie_id) to get prediction
-    # - The prediction object has an 'est' attribute with the estimated rating
-    # - Round the result to 2 decimal places
-    # - Return the predicted rating as a float
-    #
-    # Hint: prediction = self.model.predict(uid, iid); return prediction.est
-    
+        """
+        Load the trained model from disk.
+
+        Raises:
+            FileNotFoundError: The .pkl file does not exist (run
+                `python scripts/train_model.py` first).
+            ValueError: The file exists but is not a usable model.
+        """
+        try:
+            with open(self.model_path, 'rb') as f:
+                model = pickle.load(f)
+        except FileNotFoundError:
+            logger.error(
+                f"Model file not found: {self.model_path}. "
+                "Run 'python scripts/train_model.py' to create it."
+            )
+            raise
+        except (pickle.UnpicklingError, EOFError) as e:
+            logger.error(f"Model file is corrupted: {self.model_path} ({e})")
+            raise ValueError(f"Could not unpickle model at {self.model_path}") from e
+
+        if not hasattr(model, "predict"):
+            raise ValueError(
+                f"Object loaded from {self.model_path} has no predict() method "
+                f"(got {type(model).__name__})"
+            )
+
+        self.model = model
+        logger.info(f"Model loaded successfully from {self.model_path}")
+
     def predict(self, user_id: str, movie_id: str) -> float:
         """
         Predict rating for a single user-movie pair.
-        
+
+        Unknown users or movies do not raise: Surprise falls back to the global
+        mean rating, so the API stays available for cold-start requests.
+
         Args:
             user_id: User ID (string)
             movie_id: Movie ID (string)
-            
+
         Returns:
             Predicted rating (float between 1.0 and 5.0)
+
+        Raises:
+            ModelNotLoadedError: The model was never loaded.
+            ValueError: user_id or movie_id is empty.
         """
-        # TODO: Implement this method
-        #
-        # prediction = self.model.predict(???, ???)
-        # return round(prediction.???, 2)
-        pass
-    
-    # =========================================================================
-    # TODO 3: Implement predict_batch method
-    # =========================================================================
-    # Requirements:
-    # - Take a list of (user_id, movie_id) tuples
-    # - Return a list of predicted ratings
-    # - Use the predict method for each pair
-    #
-    # Hint: Use list comprehension
-    
+        if not self.is_loaded():
+            raise ModelNotLoadedError("Model is not loaded")
+
+        if not str(user_id).strip() or not str(movie_id).strip():
+            raise ValueError("user_id and movie_id must be non-empty strings")
+
+        # Surprise clips the estimate to the trainset rating scale (1-5).
+        prediction = self.model.predict(str(user_id), str(movie_id))
+        return round(float(prediction.est), 2)
+
     def predict_batch(self, pairs: List[Tuple[str, str]]) -> List[float]:
         """
         Predict ratings for multiple user-movie pairs.
-        
+
         Args:
             pairs: List of (user_id, movie_id) tuples
-            
+
         Returns:
             List of predicted ratings
         """
-        # TODO: Implement this method
-        #
-        # return [self.predict(???, ???) for ???, ??? in pairs]
-        pass
-    
+        return [self.predict(user_id, movie_id) for user_id, movie_id in pairs]
+
+    def is_known_user(self, user_id: str) -> bool:
+        """Whether the user appears in the training set (False = cold start)."""
+        try:
+            self.model.trainset.to_inner_uid(str(user_id))
+            return True
+        except (ValueError, AttributeError):
+            return False
+
+    def is_known_movie(self, movie_id: str) -> bool:
+        """Whether the movie appears in the training set (False = cold start)."""
+        try:
+            self.model.trainset.to_inner_iid(str(movie_id))
+            return True
+        except (ValueError, AttributeError):
+            return False
+
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
         return self.model is not None

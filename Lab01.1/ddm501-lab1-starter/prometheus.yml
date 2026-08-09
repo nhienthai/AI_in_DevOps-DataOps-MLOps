@@ -1,0 +1,24 @@
+# =============================================================================
+# Prometheus scrape configuration
+# DDM501 - Lab 1: First ML Product
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus scraping itself — handy for checking the stack is alive.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # The Movie Rating API. "api" is the compose service name, resolved on the
+  # compose network; the port is the container port, not the published one.
+  - job_name: movie-rating-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          service: movie-rating-api
+          env: local

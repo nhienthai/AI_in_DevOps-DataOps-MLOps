@@ -1,0 +1,28 @@
+# Local virtualenv must never be baked into the image (wrong platform + huge).
+venv/
+env/
+.venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Model artifacts are mounted at runtime via docker-compose volumes
+models/*.pkl
+models/model_metadata.json
+
+# Git / IDE / OS
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+
+# Docs and infra files (mounted or used by the host, not needed in the image)
+*.md
+Dockerfile
+docker-compose.yml
+prometheus.yml

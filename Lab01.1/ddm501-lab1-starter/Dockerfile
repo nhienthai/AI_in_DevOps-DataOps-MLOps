@@ -1,66 +1,58 @@
 # =============================================================================
 # Dockerfile for Movie Rating Prediction API
 # DDM501 - Lab 1: First ML Product
-#
-# TODO: Complete this Dockerfile
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Base image
-# -----------------------------------------------------------------------------
 FROM python:3.10-slim
 
 # -----------------------------------------------------------------------------
-# TODO 1: Set working directory
+# Working directory
 # -----------------------------------------------------------------------------
-# Hint: Use WORKDIR /app
-
-
-# -----------------------------------------------------------------------------
-# TODO 2: Copy and install dependencies
-# -----------------------------------------------------------------------------
-# Requirements:
-# - Copy requirements.txt first (for Docker cache optimization)
-# - Install dependencies with pip (use --no-cache-dir)
-#
-# Hint:
-# COPY requirements.txt .
-# RUN pip install --no-cache-dir -r requirements.txt
-
+WORKDIR /app
 
 # -----------------------------------------------------------------------------
-# TODO 3: Copy application code
+# System packages
 # -----------------------------------------------------------------------------
-# Hint: COPY . .
-
-
-# -----------------------------------------------------------------------------
-# TODO 4: Expose port
-# -----------------------------------------------------------------------------
-# Hint: EXPOSE 8000
-
+# - build-essential: scikit-surprise ships as an sdist and compiles its Cython
+#   extension at install time.
+# - curl: used by the HEALTHCHECK below.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
-# TODO 5: Add health check (BONUS)
+# Python dependencies (copied first so Docker caches this layer)
 # -----------------------------------------------------------------------------
-# Requirements:
-# - Check every 30 seconds
-# - Timeout after 10 seconds
-# - Start checking after 5 seconds
-# - Retry 3 times before marking unhealthy
-# - Use curl to check /health endpoint
-#
-# Hint:
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-#   CMD curl -f http://localhost:8000/health || exit 1
-
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y --auto-remove build-essential
 
 # -----------------------------------------------------------------------------
-# TODO 6: Set the startup command
+# Application code
 # -----------------------------------------------------------------------------
-# Requirements:
-# - Run uvicorn with app.main:app
-# - Bind to 0.0.0.0:8000
-#
-# Hint: CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY . .
 
+# Do not run the API as root.
+RUN useradd --create-home --uid 1000 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MODEL_PATH=/app/models/svd_model.pkl
+
+# -----------------------------------------------------------------------------
+# Port
+# -----------------------------------------------------------------------------
+EXPOSE 8000
+
+# -----------------------------------------------------------------------------
+# Health check
+# -----------------------------------------------------------------------------
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# -----------------------------------------------------------------------------
+# Startup command
+# -----------------------------------------------------------------------------
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

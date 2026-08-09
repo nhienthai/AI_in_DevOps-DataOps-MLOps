@@ -2,55 +2,87 @@
 # Docker Compose configuration for Movie Rating Prediction API
 # DDM501 - Lab 1: First ML Product
 #
-# TODO: Complete this docker-compose.yml
+# Services:
+#   api         - FastAPI prediction service
+#   redis       - prediction cache (BONUS)
+#   prometheus  - scrapes /metrics from the API (BONUS)
 # =============================================================================
-
-version: '3.8'
 
 services:
-  # ---------------------------------------------------------------------------
-  # TODO: Configure the API service
-  # ---------------------------------------------------------------------------
-  # Requirements:
-  # - Service name: api
-  # - Build from current directory (.)
-  # - Map port 8000 to host port 8000
-  # - Mount ./models to /app/models (for model file access)
-  # - Set environment variable MODEL_PATH=/app/models/svd_model.pkl
-  # - Restart policy: unless-stopped
-  #
-  # Hint:
-  # api:
-  #   build: .
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - ./models:/app/models
-  #   environment:
-  #     - MODEL_PATH=/app/models/svd_model.pkl
-  #   restart: unless-stopped
-  
   api:
-    # TODO: Complete this service configuration
     build: .
-    # TODO: Add ports mapping
-    # TODO: Add volumes
-    # TODO: Add environment variables
-    # TODO: Add restart policy
+    image: ddm501-movie-rating-api:1.0.0
+    container_name: ddm501-movie-rating-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # The trained model lives on the host; the image stays model-free.
+      - ./models:/app/models
+    environment:
+      - MODEL_PATH=/app/models/svd_model.pkl
+      - MODEL_VERSION=1.0.0
+      # Cache is off by default in app/config.py; the compose stack turns it on.
+      - CACHE_ENABLED=true
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_TTL_SECONDS=3600
+      - METRICS_ENABLED=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
 
-# =============================================================================
-# BONUS: Add additional services
-# =============================================================================
-# You can add these services for a more complete setup:
-#
-# redis:
-#   image: redis:7-alpine
-#   ports:
-#     - "6379:6379"
-#
-# prometheus:
-#   image: prom/prometheus
-#   ports:
-#     - "9090:9090"
-#   volumes:
-#     - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  # ---------------------------------------------------------------------------
+  # BONUS: Redis — caches predictions keyed by model version + user + movie
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: ddm501-redis
+    ports:
+      - "6379:6379"
+    # Cache entries are disposable, so cap memory and evict the coldest keys
+    # instead of letting Redis grow without bound or start refusing writes.
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # BONUS: Prometheus — scrapes GET /metrics on the API every 15s
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: ddm501-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+  prometheus_data:

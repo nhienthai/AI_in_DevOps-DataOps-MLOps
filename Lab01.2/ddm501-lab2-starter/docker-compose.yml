@@ -2,40 +2,79 @@
 # Docker Compose for ML Pipeline with MLflow and Airflow
 # DDM501 - Lab 2: ML Pipeline & Experiment Tracking
 #
-# TODO: Complete the service configurations
+# Services:
+#   mlflow              - tracking server + model registry   (host port 5001)
+#   postgres            - Airflow metadata database
+#   airflow-init        - one-shot DB migration + admin user
+#   airflow-webserver   - Airflow UI                          (host port 8080)
+#   airflow-scheduler   - runs the DAG on schedule
 # =============================================================================
 
-version: '3.8'
+# ===========================================================================
+# Shared Airflow configuration
+# ===========================================================================
+# All three Airflow services need identical settings; an anchor keeps them
+# from drifting apart.
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: docker/airflow.Dockerfile
+  image: ddm501-airflow:2.8.0
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    # Demo key. Generate your own with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # The starter's placeholder is not valid base64 and breaks connection
+    # encryption as soon as Airflow tries to use it.
+    AIRFLOW__CORE__FERNET_KEY: g_pDGJkiwyOgSN8e17THN97Tw7YTrWaZZTk7tnRHehA=
+    AIRFLOW__WEBSERVER__SECRET_KEY: 660673b95e73cc23c59f1eaede5ee570
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
+    # Service name, not localhost: this resolves on the compose network.
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+    PYTHONPATH: /opt/airflow
+  volumes: &airflow-volumes
+    - ./dags:/opt/airflow/dags
+    - ./pipeline:/opt/airflow/pipeline
+    - ./experiments:/opt/airflow/experiments
+    - ./models:/opt/airflow/models
+    - ./artifacts:/opt/airflow/artifacts
+    - ./logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
 
 services:
   # ===========================================================================
   # MLflow Tracking Server
   # ===========================================================================
-  # TODO 1: Configure MLflow service
-  # 
-  # Requirements:
-  # - Use image: ghcr.io/mlflow/mlflow:v2.9.2
-  # - Expose port 5000
-  # - Mount ./mlruns to /mlflow/mlruns for artifact storage
-  # - Set environment variables for backend and artifact store
-  # - Command to start server with SQLite backend
-  
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.9.2
     container_name: mlflow-server
     ports:
-      - "5000:5000"
+      # 5001 on the host: macOS AirPlay Receiver occupies 5000.
+      - "5001:5000"
     volumes:
-      - ./mlruns:/mlflow/mlruns
-      - ./mlflow.db:/mlflow/mlflow.db
-    environment:
-      - MLFLOW_TRACKING_URI=http://localhost:5000
+      # One directory holds both the SQLite backend store and the artifacts.
+      # Do not bind-mount mlflow.db as a file — Docker creates a *directory*
+      # when the path does not exist yet, and the server then fails to open it.
+      - ./mlflow:/mlflow
+    # --serve-artifacts proxies artifact upload/download through this server, so
+    # clients on the host never need to see the container's filesystem paths.
     command: >
       mlflow server
-      --backend-store-uri sqlite:///mlflow/mlflow.db
-      --default-artifact-root /mlflow/mlruns
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/mlartifacts
+      --serve-artifacts
       --host 0.0.0.0
       --port 5000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 5
     restart: unless-stopped
 
   # ===========================================================================
@@ -57,18 +96,24 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
-  # TODO 2: Configure Airflow Webserver
+  # Airflow Initialization (one-shot: migrate DB + create admin user)
   # ===========================================================================
-  # Requirements:
-  # - Use image: apache/airflow:2.8.0
-  # - Expose port 8080
-  # - Mount ./dags to /opt/airflow/dags
-  # - Mount ./pipeline to /opt/airflow/pipeline
-  # - Set environment variables for database connection
-  # - Depends on postgres and airflow-init
-  
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    # Keep this on ONE line. A YAML folded block (>) does not join lines that
+    # are indented deeper than the first one — it keeps the newlines, so the
+    # flags would run as separate shell commands and user creation fails
+    # silently (the trailing `|| true` still makes the container exit 0).
+    # `|| true` is only here so re-running init with an existing user is fine.
+    command: ["bash", "-c", "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true"]
+    restart: "no"
+
+  # ===========================================================================
+  # Airflow Webserver
+  # ===========================================================================
   airflow-webserver:
-    image: apache/airflow:2.8.0
+    <<: *airflow-common
     container_name: airflow-webserver
     depends_on:
       postgres:
@@ -77,100 +122,34 @@ services:
         condition: service_completed_successfully
     ports:
       - "8080:8080"
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./pipeline:/opt/airflow/pipeline
-      - ./logs:/opt/airflow/logs
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - AIRFLOW__CORE__FERNET_KEY=your-fernet-key-here
-      - AIRFLOW__WEBSERVER__SECRET_KEY=your-secret-key-here
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
     command: webserver
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
+      start_period: 60s
       retries: 5
     restart: unless-stopped
 
   # ===========================================================================
-  # TODO 3: Configure Airflow Scheduler
+  # Airflow Scheduler
   # ===========================================================================
-  # Requirements:
-  # - Similar to webserver but runs scheduler command
-  # - No port exposure needed
-  # - Same volume mounts and environment variables
-  
   airflow-scheduler:
-    image: apache/airflow:2.8.0
+    <<: *airflow-common
     container_name: airflow-scheduler
     depends_on:
       postgres:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./pipeline:/opt/airflow/pipeline
-      - ./logs:/opt/airflow/logs
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - AIRFLOW__CORE__FERNET_KEY=your-fernet-key-here
-      - AIRFLOW__CORE__LOAD_EXAMPLES=false
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
     command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 20s
+      start_period: 60s
+      retries: 5
     restart: unless-stopped
-
-  # ===========================================================================
-  # Airflow Initialization
-  # ===========================================================================
-  airflow-init:
-    image: apache/airflow:2.8.0
-    container_name: airflow-init
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - AIRFLOW__CORE__FERNET_KEY=your-fernet-key-here
-    volumes:
-      - ./dags:/opt/airflow/dags
-    command: >
-      bash -c "
-        airflow db init &&
-        airflow users create \
-          --username admin \
-          --password admin \
-          --firstname Admin \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com || true
-      "
-
-  # ===========================================================================
-  # ML Pipeline Application (Optional - for running pipeline)
-  # ===========================================================================
-  # TODO 4: Configure ML Pipeline service (BONUS)
-  # 
-  # This service can be used to run the pipeline manually
-  # or for testing purposes
-  
-  # ml-pipeline:
-  #   build: .
-  #   container_name: ml-pipeline
-  #   volumes:
-  #     - ./pipeline:/app/pipeline
-  #     - ./experiments:/app/experiments
-  #     - ./models:/app/models
-  #   environment:
-  #     - MLFLOW_TRACKING_URI=http://mlflow:5000
-  #   depends_on:
-  #     - mlflow
-  #   command: python -m pipeline.run_pipeline
 
 # =============================================================================
 # Volumes

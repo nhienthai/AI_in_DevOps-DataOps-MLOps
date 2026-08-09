@@ -6,12 +6,16 @@ This module handles:
 - Calculating evaluation metrics
 - Logging metrics to MLflow
 - Creating evaluation visualizations
-
-TODO: Complete the functions marked with TODO.
 """
 
 import logging
 from typing import Any, Dict, List, Optional
+
+import matplotlib
+
+# Agg has no GUI event loop. Airflow workers and pytest run without a display,
+# and the default macOS backend would abort there.
+matplotlib.use("Agg")
 
 import mlflow
 import numpy as np
@@ -26,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# TODO 1: Implement evaluate_model function
+# Evaluation
 # =============================================================================
 def evaluate_model(
     model: Any,
@@ -35,113 +39,127 @@ def evaluate_model(
     log_to_mlflow: bool = True
 ) -> Dict[str, float]:
     """
-    Evaluate model and log metrics to MLflow.
-    
-    TODO: Implement this function with the following requirements:
-    
-    1. Make predictions using model.test(testset)
-    2. Calculate RMSE and MAE using surprise.accuracy
-    3. If log_to_mlflow is True:
-       - Resume the MLflow run using the run_id
-       - Log RMSE and MAE as metrics
-       - Create and log evaluation plots
-    4. Return dictionary with metrics
-    
+    Evaluate a model on the test set and log metrics to its MLflow run.
+
+    Metrics land on the *training* run (reopened by run_id) rather than a new
+    run, so the MLflow UI shows parameters and metrics on one row.
+
     Args:
         model: Trained Surprise model
         testset: Test set as list of (user, item, rating) tuples
         run_id: MLflow run ID to log metrics to
         log_to_mlflow: Whether to log metrics to MLflow
-        
+
     Returns:
-        Dictionary with evaluation metrics {'rmse': float, 'mae': float}
-        
+        Dictionary with evaluation metrics: rmse, mae, mse, mape, coverage,
+        n_predictions, n_impossible.
+
+    Raises:
+        ValueError: testset is empty — there is nothing to evaluate.
+
     Example:
         metrics = evaluate_model(model, testset, run_id)
         print(f"RMSE: {metrics['rmse']:.4f}")
     """
-    # TODO: Implement this function
-    #
-    # Hints:
-    # 1. Use model.test(testset) to get predictions
-    # 2. Use accuracy.rmse(predictions, verbose=False) for RMSE
-    # 3. Use accuracy.mae(predictions, verbose=False) for MAE
-    # 4. Use mlflow.start_run(run_id=run_id) to resume a run
-    # 5. Use mlflow.log_metric(name, value) to log metrics
-    #
-    # Example structure:
-    # logger.info("Evaluating model...")
-    # predictions = model.test(testset)
-    # 
-    # rmse = accuracy.rmse(predictions, verbose=False)
-    # mae = accuracy.mae(predictions, verbose=False)
-    # 
-    # metrics = {"rmse": rmse, "mae": mae}
-    # 
-    # if log_to_mlflow:
-    #     with mlflow.start_run(run_id=run_id):
-    #         mlflow.log_metric("rmse", rmse)
-    #         mlflow.log_metric("mae", mae)
-    #         
-    #         # Create and log plots
-    #         fig = create_prediction_distribution_plot(predictions)
-    #         mlflow.log_figure(fig, "prediction_distribution.png")
-    #         plt.close(fig)
-    # 
-    # logger.info(f"Evaluation complete. RMSE={rmse:.4f}, MAE={mae:.4f}")
-    # return metrics
-    
-    pass  # Remove this and implement the function
+    if not testset:
+        raise ValueError("testset is empty; nothing to evaluate")
+
+    logger.info(f"Evaluating model on {len(testset)} test ratings...")
+    predictions = model.test(testset)
+
+    rmse = accuracy.rmse(predictions, verbose=False)
+    mae = accuracy.mae(predictions, verbose=False)
+
+    metrics = {"rmse": float(rmse), "mae": float(mae)}
+    metrics.update(calculate_additional_metrics(predictions))
+
+    if log_to_mlflow:
+        if not run_id:
+            raise ValueError("run_id is required when log_to_mlflow is True")
+
+        # nested=False + an explicit run_id reopens the finished training run.
+        with mlflow.start_run(run_id=run_id):
+            for name, value in metrics.items():
+                if value is not None:
+                    mlflow.log_metric(name, value)
+
+            fig = create_prediction_distribution_plot(predictions)
+            mlflow.log_figure(fig, "plots/prediction_distribution.png")
+            plt.close(fig)
+
+            fig = create_error_by_rating_plot(predictions)
+            mlflow.log_figure(fig, "plots/error_by_rating.png")
+            plt.close(fig)
+
+            mlflow.set_tag("stage", "evaluated")
+
+    logger.info(f"Evaluation complete. RMSE={rmse:.4f}, MAE={mae:.4f}")
+    return metrics
 
 
 # =============================================================================
-# TODO 2: Implement calculate_additional_metrics function
+# Additional metrics
 # =============================================================================
 def calculate_additional_metrics(predictions: List) -> Dict[str, float]:
     """
-    Calculate additional evaluation metrics beyond RMSE and MAE.
-    
-    TODO: Implement this function that calculates:
-    1. Mean Squared Error (MSE)
-    2. Mean Absolute Percentage Error (MAPE) - if applicable
-    3. Coverage (percentage of user-item pairs that can be predicted)
-    4. Any other relevant metrics
-    
+    Calculate evaluation metrics beyond RMSE and MAE.
+
+    Metrics returned:
+        mse           Mean squared error.
+        rmse_manual   RMSE recomputed from raw errors — a cross-check on
+                      Surprise's own accuracy.rmse.
+        mape          Mean absolute percentage error, in percent. MovieLens
+                      ratings are >= 1 so no division by zero occurs in
+                      practice, but zero actuals are excluded anyway.
+        coverage      Share of test pairs the model could actually estimate.
+                      Surprise flags cold-start pairs as `was_impossible` and
+                      falls back to the global mean; a low coverage means the
+                      RMSE above is mostly measuring that fallback.
+        n_predictions Number of predictions scored.
+        n_impossible  Count of cold-start fallbacks.
+
     Args:
         predictions: List of Surprise Prediction objects
-        
+
     Returns:
         Dictionary with additional metrics
-        
-    Hints:
-        - Each prediction has: prediction.r_ui (actual) and prediction.est (predicted)
-        - Be careful with division by zero for MAPE
     """
-    # TODO: Implement this function
-    #
-    # Example structure:
-    # actuals = [pred.r_ui for pred in predictions]
-    # estimated = [pred.est for pred in predictions]
-    # 
-    # actuals = np.array(actuals)
-    # estimated = np.array(estimated)
-    # 
-    # mse = np.mean((actuals - estimated) ** 2)
-    # 
-    # # MAPE (handle division by zero)
-    # non_zero_mask = actuals != 0
-    # if np.any(non_zero_mask):
-    #     mape = np.mean(np.abs((actuals[non_zero_mask] - estimated[non_zero_mask]) / actuals[non_zero_mask])) * 100
-    # else:
-    #     mape = None
-    # 
-    # return {
-    #     "mse": mse,
-    #     "mape": mape,
-    #     "n_predictions": len(predictions),
-    # }
-    
-    pass  # Remove this and implement the function
+    if not predictions:
+        return {
+            "mse": 0.0,
+            "rmse_manual": 0.0,
+            "mape": None,
+            "coverage": 0.0,
+            "n_predictions": 0,
+            "n_impossible": 0,
+        }
+
+    actuals = np.array([pred.r_ui for pred in predictions], dtype=float)
+    estimated = np.array([pred.est for pred in predictions], dtype=float)
+
+    errors = estimated - actuals
+    mse = float(np.mean(errors ** 2))
+
+    non_zero = actuals != 0
+    mape = (
+        float(np.mean(np.abs(errors[non_zero] / actuals[non_zero])) * 100)
+        if np.any(non_zero)
+        else None
+    )
+
+    n_impossible = sum(
+        1 for pred in predictions if pred.details.get("was_impossible", False)
+    )
+    coverage = float((len(predictions) - n_impossible) / len(predictions))
+
+    return {
+        "mse": mse,
+        "rmse_manual": float(np.sqrt(mse)),
+        "mape": mape,
+        "coverage": coverage,
+        "n_predictions": len(predictions),
+        "n_impossible": n_impossible,
+    }
 
 
 # =============================================================================
@@ -254,15 +272,17 @@ if __name__ == "__main__":
     print("Testing Evaluation Module")
     print("=" * 50)
     
-    # This will work after training.py is implemented
-    # from pipeline.data_ingestion import load_and_split
-    # from pipeline.training import train_model, setup_mlflow
-    # 
-    # setup_mlflow()
-    # trainset, testset, _ = load_and_split()
-    # model, run_id = train_model(trainset, model_type="svd", n_factors=50)
-    # metrics = evaluate_model(model, testset, run_id)
-    # print(f"Metrics: {metrics}")
-    
-    print("Evaluation module loaded successfully.")
-    print("Implement the TODO functions and test with the training module.")
+    # Evaluate a quick model without touching MLflow.
+    from surprise import SVD
+
+    from pipeline.data_ingestion import load_and_split
+
+    trainset, testset, _ = load_and_split()
+    model = SVD(n_factors=10, n_epochs=5, random_state=42)
+    model.fit(trainset)
+
+    metrics = evaluate_model(model, testset, run_id="", log_to_mlflow=False)
+
+    print("\nMetrics:")
+    for name, value in metrics.items():
+        print(f"  {name:22} {value}")

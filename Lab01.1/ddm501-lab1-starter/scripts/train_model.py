@@ -11,8 +11,10 @@ Usage:
     python scripts/train_model.py
 """
 
+import json
 import pickle
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from surprise import Dataset, SVD
@@ -85,8 +87,36 @@ def main():
     
     with open(model_path, 'wb') as f:
         pickle.dump(model, f)
-    
+
     print("      Model saved successfully!")
+
+    # Metrics are served by GET /model/info, so persist them next to the model.
+    metadata_path = models_dir / "model_metadata.json"
+    metadata = {
+        "model_type": "SVD (Collaborative Filtering)",
+        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "metrics": {
+            "rmse": round(float(cv_results['test_rmse'].mean()), 4),
+            "mae": round(float(cv_results['test_mae'].mean()), 4),
+            "cv_folds": 5,
+        },
+        "training_set": {
+            "dataset": "MovieLens 100K",
+            "n_users": trainset.n_users,
+            "n_items": trainset.n_items,
+            "n_ratings": trainset.n_ratings,
+        },
+        "hyperparameters": {
+            "n_factors": 100,
+            "n_epochs": 20,
+            "lr_all": 0.005,
+            "reg_all": 0.02,
+        },
+    }
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"      Metadata saved to {metadata_path}")
     
     # ==========================================================================
     # Test prediction

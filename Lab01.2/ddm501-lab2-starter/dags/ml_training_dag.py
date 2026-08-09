@@ -8,8 +8,6 @@ This DAG orchestrates the movie rating prediction training pipeline:
 4. Evaluate Model
 5. Register Model (conditional)
 
-TODO: Complete the DAG definition and task functions.
-
 Usage:
     Copy this file to your Airflow dags/ folder
     Access Airflow UI at http://localhost:8080
@@ -42,15 +40,8 @@ default_args = {
 # =============================================================================
 # DAG Definition
 # =============================================================================
-# TODO: Complete the DAG definition
-#
-# Requirements:
-# - DAG ID: 'movie_rating_training'
-# - Description: 'ML Training Pipeline for Movie Rating Prediction'
-# - Schedule: Weekly (@weekly) or use cron expression '0 0 * * 0' for every Sunday
-# - Start date: January 1, 2024
-# - Catchup: False (don't run for past dates)
-# - Tags: ['ml', 'training', 'movie-rating']
+# Weekly retraining. catchup=False so enabling the DAG does not backfill one
+# run per week since the start_date.
 
 dag = DAG(
     'movie_rating_training',
@@ -100,136 +91,133 @@ def load_data_task(**context):
 
 
 # =============================================================================
-# TODO 1: Implement preprocess_data_task
+# Task 2: Preprocess and validate
 # =============================================================================
 def preprocess_data_task(**context):
     """
     Task 2: Preprocess and validate data.
-    
-    TODO: Implement this function that:
-    1. Retrieves data path from XCom
-    2. Loads the saved trainset and testset
-    3. Runs preprocessing using preprocess_data()
-    4. Pushes preprocessing report via XCom
-    
-    Hints:
-    - Use context['ti'].xcom_pull(key='data_path') to get the path
-    - Load pickle files with pickle.load()
-    - Push results with context['ti'].xcom_push()
+
+    Loads the pickles written by load_data, runs the validation suite, and
+    pushes the report to XCom.
+
+    Raises:
+        ValueError: Validation failed. Stopping here is deliberate — training on
+            data that failed validation would produce a model nobody can trust,
+            and the run would look successful.
     """
-    # TODO: Implement this function
-    #
-    # from pipeline.preprocessing import preprocess_data
-    # 
-    # # Get data path from previous task
-    # tmp_dir = context['ti'].xcom_pull(key='data_path')
-    # 
-    # # Load data
-    # with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
-    #     trainset = pickle.load(f)
-    # with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
-    #     testset = pickle.load(f)
-    # 
-    # # Preprocess
-    # report = preprocess_data(trainset, testset)
-    # 
-    # # Push report
-    # context['ti'].xcom_push(key='preprocess_report', value=report)
-    # 
-    # return "Preprocessing complete"
-    
-    pass  # Remove this and implement
+    from pipeline.preprocessing import preprocess_data
+
+    tmp_dir = context['ti'].xcom_pull(key='data_path')
+    if not tmp_dir:
+        raise ValueError("No data_path in XCom — did load_data run?")
+
+    with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
+        trainset = pickle.load(f)
+    with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
+        testset = pickle.load(f)
+
+    report = preprocess_data(trainset, testset)
+
+    if not report["preprocessing_successful"]:
+        issues = (
+            report["trainset_validation"]["issues"]
+            + report["testset_validation"]["issues"]
+        )
+        raise ValueError(f"Data validation failed: {issues}")
+
+    # XCom values are serialised, so push only the small scalar summary rather
+    # than the whole nested report.
+    context['ti'].xcom_push(key='preprocess_report', value={
+        "successful": report["preprocessing_successful"],
+        "n_users": report["trainset_validation"]["n_users"],
+        "n_items": report["trainset_validation"]["n_items"],
+        "n_ratings": report["trainset_validation"]["n_ratings"],
+        "mean_rating": round(report["rating_distribution"]["mean"], 4),
+    })
+
+    print(f"Validation passed: {report['trainset_validation']['n_ratings']} train ratings")
+    return "Preprocessing complete"
 
 
 # =============================================================================
-# TODO 2: Implement train_model_task
+# Task 3: Train with MLflow tracking
 # =============================================================================
+# The weekly retrain uses the best configuration found by the hyperparameter
+# sweep (see experiment_report.md), not the library defaults.
+TRAINING_CONFIG = {
+    "model_type": "svd",
+    "n_factors": 100,
+    "n_epochs": 20,
+}
+
+
 def train_model_task(**context):
     """
-    Task 3: Train the model with MLflow tracking.
-    
-    TODO: Implement this function that:
-    1. Retrieves trainset from temporary storage
-    2. Sets up MLflow
-    3. Trains the model using train_model()
-    4. Pushes run_id via XCom for evaluation task
-    
-    Configuration:
-    - model_type: 'svd'
-    - n_factors: 100
-    - n_epochs: 20
+    Task 3: Train the model and log the run to MLflow.
+
+    The run name carries the Airflow logical date, so every scheduled retrain is
+    identifiable in the MLflow UI.
     """
-    # TODO: Implement this function
-    #
-    # from pipeline.training import train_model, setup_mlflow
-    # 
-    # # Get data path
-    # tmp_dir = context['ti'].xcom_pull(key='data_path')
-    # 
-    # # Load trainset
-    # with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
-    #     trainset = pickle.load(f)
-    # 
-    # # Setup MLflow
-    # setup_mlflow()
-    # 
-    # # Train model
-    # model, run_id = train_model(
-    #     trainset,
-    #     model_type='svd',
-    #     run_name=f"airflow_run_{context['ds']}",
-    #     n_factors=100,
-    #     n_epochs=20
-    # )
-    # 
-    # # Save model for evaluation
-    # with open(f'{tmp_dir}/model.pkl', 'wb') as f:
-    #     pickle.dump(model, f)
-    # 
-    # # Push run_id
-    # context['ti'].xcom_push(key='run_id', value=run_id)
-    # 
-    # return f"Model trained. Run ID: {run_id}"
-    
-    pass  # Remove this and implement
+    from pipeline.training import train_model, setup_mlflow
+
+    tmp_dir = context['ti'].xcom_pull(key='data_path')
+    if not tmp_dir:
+        raise ValueError("No data_path in XCom — did load_data run?")
+
+    with open(f'{tmp_dir}/trainset.pkl', 'rb') as f:
+        trainset = pickle.load(f)
+
+    setup_mlflow()
+
+    params = {k: v for k, v in TRAINING_CONFIG.items() if k != "model_type"}
+    model, run_id = train_model(
+        trainset,
+        model_type=TRAINING_CONFIG["model_type"],
+        run_name=f"airflow_{context['ds']}",
+        **params
+    )
+
+    with open(f'{tmp_dir}/model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+
+    context['ti'].xcom_push(key='run_id', value=run_id)
+
+    print(f"Model trained. Run ID: {run_id}")
+    return f"Model trained. Run ID: {run_id}"
 
 
 # =============================================================================
-# TODO 3: Implement evaluate_model_task
+# Task 4: Evaluate
 # =============================================================================
 def evaluate_model_task(**context):
     """
-    Task 4: Evaluate the trained model.
-    
-    TODO: Implement this function that:
-    1. Retrieves model and testset from storage
-    2. Retrieves run_id from XCom
-    3. Evaluates using evaluate_model()
-    4. Pushes metrics via XCom
+    Task 4: Evaluate the trained model and log metrics onto the training run.
+
+    Metrics go to XCom as plain floats, which the branch task reads to decide
+    whether this model is good enough to register.
     """
-    # TODO: Implement this function
-    #
-    # from pipeline.evaluation import evaluate_model
-    # 
-    # # Get data path and run_id
-    # tmp_dir = context['ti'].xcom_pull(key='data_path')
-    # run_id = context['ti'].xcom_pull(key='run_id')
-    # 
-    # # Load model and testset
-    # with open(f'{tmp_dir}/model.pkl', 'rb') as f:
-    #     model = pickle.load(f)
-    # with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
-    #     testset = pickle.load(f)
-    # 
-    # # Evaluate
-    # metrics = evaluate_model(model, testset, run_id)
-    # 
-    # # Push metrics
-    # context['ti'].xcom_push(key='metrics', value=metrics)
-    # 
-    # return f"Evaluation complete. RMSE: {metrics['rmse']:.4f}"
-    
-    pass  # Remove this and implement
+    from pipeline.evaluation import evaluate_model
+
+    tmp_dir = context['ti'].xcom_pull(key='data_path')
+    run_id = context['ti'].xcom_pull(key='run_id')
+
+    if not run_id:
+        raise ValueError("No run_id in XCom — did train_model run?")
+
+    with open(f'{tmp_dir}/model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    with open(f'{tmp_dir}/testset.pkl', 'rb') as f:
+        testset = pickle.load(f)
+
+    metrics = evaluate_model(model, testset, run_id)
+
+    # Keep XCom JSON-serialisable: drop None (mape can be None) and cast.
+    context['ti'].xcom_push(key='metrics', value={
+        k: float(v) for k, v in metrics.items() if v is not None
+    })
+
+    print(f"Evaluation complete. RMSE={metrics['rmse']:.4f} MAE={metrics['mae']:.4f}")
+    return f"Evaluation complete. RMSE: {metrics['rmse']:.4f}"
 
 
 def decide_registration(**context):
@@ -332,19 +320,9 @@ t_cleanup = PythonOperator(
 
 
 # =============================================================================
-# TODO 4: Define Task Dependencies
+# Task Dependencies
 # =============================================================================
-# Define the task execution order using >> operator
-#
-# The flow should be:
-# load_data -> preprocess -> train -> evaluate -> decide -> [register OR skip] -> cleanup
-#
-# Hint:
-# t_load_data >> t_preprocess >> t_train >> t_evaluate >> t_decide
-# t_decide >> [t_register, t_skip]
-# [t_register, t_skip] >> t_cleanup
-
-# TODO: Define the dependencies
+# load_data -> preprocess -> train -> evaluate -> decide -> [register|skip] -> cleanup
 t_load_data >> t_preprocess >> t_train >> t_evaluate >> t_decide
 t_decide >> [t_register, t_skip]
 [t_register, t_skip] >> t_cleanup

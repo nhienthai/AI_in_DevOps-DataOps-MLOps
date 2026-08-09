@@ -21,8 +21,15 @@ ARTIFACTS_DIR.mkdir(exist_ok=True)
 # =============================================================================
 # MLflow Configuration
 # =============================================================================
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+# Host port 5001, not 5000: on macOS the AirPlay Receiver holds 5000, so the
+# MLflow container publishes 5001 -> 5000. Inside Docker use http://mlflow:5000.
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
 MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "movie-rating-prediction")
+MLFLOW_REGISTERED_MODEL_NAME = os.getenv("MLFLOW_REGISTERED_MODEL_NAME", "movie-rating-model")
+
+# Artifact path inside a run where the model is logged. Registry lookups must
+# use the same value, or `runs:/<id>/<path>` resolves to nothing.
+MLFLOW_MODEL_ARTIFACT_PATH = "model"
 
 # =============================================================================
 # Data Configuration
