@@ -63,7 +63,7 @@
       "id": 4,
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "sum(rate(ml_prediction_errors_total[5m])) / clamp_min(sum(rate(ml_predictions_total[5m])) + sum(rate(ml_prediction_errors_total[5m])), 0.000001)", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "(sum by (model_version) (rate(ml_prediction_errors_total[5m])) or (0 * sum by (model_version) (rate(ml_predictions_total[5m])))) / clamp_min(sum by (model_version) (rate(ml_predictions_total[5m])) + (sum by (model_version) (rate(ml_prediction_errors_total[5m])) or (0 * sum by (model_version) (rate(ml_predictions_total[5m])))), 0.000001)", "refId": "A" }
       ],
       "title": "Error Rate",
       "type": "stat"

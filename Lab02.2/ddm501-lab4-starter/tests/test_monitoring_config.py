@@ -39,9 +39,10 @@ def test_grafana_queries_and_datasource_uid_match_metrics():
     ]
     assert "ml_model_info" in expressions
     assert any(
-        "sum(rate(ml_prediction_errors_total[5m]))" in expr
+        "sum by (model_version) (rate(ml_prediction_errors_total[5m]))" in expr
         for expr in expressions
     )
+    assert any("0 * sum by (model_version)" in expr for expr in expressions)
     assert any("ml_prediction_value_sum" in expr for expr in expressions)
 
     datasource = _compact(
