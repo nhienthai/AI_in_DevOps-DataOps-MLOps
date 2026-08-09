@@ -43,13 +43,20 @@ models/*.pkl
 data/
 *.csv
 
-# Artifacts
+# Artifacts (generated plots, re-created by every run)
 artifacts/
 *.png
 *.jpg
 
+# ...but the submission screenshots ARE a deliverable and must be committed.
+!docs/screenshots/**
+!docs/screenshots/*.png
+!docs/screenshots/*.jpg
+
 # Reports
-experiment_report.md
+# experiment_report.md is a graded deliverable — keep it tracked.
+# (Uncomment the next line if you would rather regenerate it on every clone.)
+# experiment_report.md
 
 # Temporary
 /tmp/

@@ -8,6 +8,7 @@ Usage:
     python -m experiments.run_experiments
 """
 
+import argparse
 import logging
 from typing import Dict, Any, List
 import json
@@ -142,6 +143,75 @@ def run_all_experiments(
 
 
 # =============================================================================
+# Rebuilding results from MLflow
+# =============================================================================
+# Params come back from MLflow as strings. Rebuilding the original config means
+# restoring their types, or the report would print n_factors='50'.
+_PARAM_CASTS = {
+    "n_factors": int,
+    "n_epochs": int,
+    "k": int,
+    "lr_all": float,
+    "reg_all": float,
+}
+
+# Bookkeeping params logged alongside the hyperparameters.
+_NON_CONFIG_PARAMS = {"n_train_users", "n_train_items", "n_train_ratings"}
+
+
+def load_results_from_mlflow(
+    experiment_name: str = TUNING_EXPERIMENT_NAME
+) -> List[Dict[str, Any]]:
+    """
+    Rebuild the results list from runs already logged to MLflow.
+
+    Lets the report be regenerated after a reporting fix without retraining —
+    which would otherwise duplicate every run in the UI.
+
+    Args:
+        experiment_name: Experiment to read runs from
+
+    Returns:
+        Results in the same shape as run_all_experiments().
+
+    Raises:
+        ValueError: The experiment does not exist.
+    """
+    client = MlflowClient()
+    experiment = client.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        raise ValueError(f"Experiment '{experiment_name}' not found")
+
+    results = []
+    for run in client.search_runs(
+        [experiment.experiment_id],
+        filter_string="metrics.rmse > -1e30",
+        order_by=["metrics.rmse ASC"],
+        max_results=1000,
+    ):
+        config: Dict[str, Any] = {}
+        for key, value in run.data.params.items():
+            if key in _NON_CONFIG_PARAMS:
+                continue
+            if key == "sim_options":
+                config[key] = json.loads(value)
+            elif "." in key:
+                continue  # flattened duplicate of sim_options
+            else:
+                config[key] = _PARAM_CASTS.get(key, str)(value)
+
+        results.append({
+            "config": config,
+            "run_id": run.info.run_id,
+            "run_name": run.data.tags.get("mlflow.runName", ""),
+            "metrics": run.data.metrics,
+        })
+
+    logger.info(f"Loaded {len(results)} runs from '{experiment_name}'")
+    return results
+
+
+# =============================================================================
 # Reporting
 # =============================================================================
 def _format_params(config: Dict[str, Any]) -> str:
@@ -245,18 +315,49 @@ def _analyse(successful: List[Dict[str, Any]]) -> List[str]:
             )
 
     # --- Cold start ----------------------------------------------------------
-    coverages = {r["metrics"].get("coverage") for r in successful}
-    coverages.discard(None)
-    if coverages and max(coverages) < 1.0:
-        lines.append(
-            f"Coverage tops out at {max(coverages):.3f}: some test pairs are "
-            f"cold-start and fall back to the global mean, which flatters RMSE.\n"
-        )
-    elif coverages:
-        lines.append(
-            "Coverage is 1.000 across all runs — every test pair was scored by "
-            "the model itself, so no RMSE is inflated by global-mean fallbacks.\n"
-        )
+    # Compare against the MINIMUM. Checking the maximum would report full
+    # coverage whenever any single run reached 1.0, hiding the runs that fell
+    # back to the global mean.
+    covered = [r for r in successful if r["metrics"].get("coverage") is not None]
+    if covered:
+        lines.append("### Coverage (cold-start fallbacks)\n")
+        worst = min(covered, key=lambda r: r["metrics"]["coverage"])
+        best = max(covered, key=lambda r: r["metrics"]["coverage"])
+
+        if worst["metrics"]["coverage"] >= 1.0:
+            lines.append(
+                "Coverage is 1.000 in every run — each test pair was scored by "
+                "the model itself, so no RMSE is inflated by global-mean "
+                "fallbacks.\n"
+            )
+        else:
+            lines.append(
+                "| Algorithm | Coverage | Cold-start pairs |\n"
+                "|-----------|---------:|-----------------:|"
+            )
+            seen = set()
+            for r in sorted(covered, key=lambda r: r["metrics"]["coverage"]):
+                algo = r["config"]["model_type"].upper()
+                key = (algo, round(r["metrics"]["coverage"], 6))
+                if key in seen:
+                    continue
+                seen.add(key)
+                lines.append(
+                    f"| {algo} | {r['metrics']['coverage']:.4f} "
+                    f"| {int(r['metrics']['n_impossible'])} |"
+                )
+            lines.append("")
+            lines.append(
+                f"Coverage ranges from {worst['metrics']['coverage']:.4f} to "
+                f"{best['metrics']['coverage']:.4f}. The "
+                f"{int(worst['metrics']['n_impossible'])} pairs that "
+                f"`{worst['run_name']}` could not score fell back to the global "
+                f"mean, so its RMSE is very slightly flattered — the fallback is "
+                f"a safe average rather than a real, riskier prediction. At "
+                f"{worst['metrics']['n_impossible'] / worst['metrics']['n_predictions'] * 100:.2f}% "
+                f"of the test set the effect is negligible here, but the same "
+                f"gap on a sparser catalogue would make RMSE misleading.\n"
+            )
 
     return lines
 
@@ -378,20 +479,29 @@ def generate_experiment_report(
 # Main Execution
 # =============================================================================
 def main():
-    """Run all experiments and generate report."""
-    
+    """Run all experiments and generate the report."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Regenerate the report from runs already in MLflow, without retraining",
+    )
+    args = parser.parse_args()
+
     logger.info("=" * 60)
     logger.info("Starting Experiment Runner")
     logger.info("=" * 60)
-    
+
     # Setup MLflow
     setup_mlflow()
-    
-    # Run experiments
-    results = run_all_experiments(
-        configs=EXPERIMENT_CONFIGS,
-        experiment_name=TUNING_EXPERIMENT_NAME
-    )
+
+    if args.report_only:
+        results = load_results_from_mlflow(TUNING_EXPERIMENT_NAME)
+    else:
+        results = run_all_experiments(
+            configs=EXPERIMENT_CONFIGS,
+            experiment_name=TUNING_EXPERIMENT_NAME
+        )
     
     # Generate report
     report = generate_experiment_report(results, "experiment_report.md")

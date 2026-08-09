@@ -74,6 +74,8 @@ ddm501-lab2-starter/
 │   └── ml_training_dag.py  # Airflow DAG (7 tasks, weekly)
 ├── docker/
 │   └── airflow.Dockerfile  # Airflow image with the pipeline's dependencies
+├── docs/
+│   └── screenshots/        # Submission screenshots + notes on each
 ├── tests/
 │   └── test_pipeline.py    # 35 tests
 ├── docker-compose.yml      # mlflow + postgres + airflow (init/web/scheduler)
@@ -132,6 +134,13 @@ python -m experiments.run_experiments
 
 Runs all 9 configurations from `EXPERIMENT_CONFIGS`, logs each to the
 `hyperparameter-tuning` experiment, and writes `experiment_report.md`.
+
+To rewrite only the report from runs already in MLflow — no retraining, no
+duplicate runs cluttering the UI:
+
+```bash
+python -m experiments.run_experiments --report-only
+```
 
 ### 5. Start Airflow
 
@@ -310,5 +319,6 @@ The `MLFLOW_TRACKING_URI` matters: without it `gc` cannot resolve the
 - [x] `experiments/run_experiments.py` — 9-configuration sweep
 - [x] `docker-compose.yml` — MLflow + Airflow services
 - [x] Experiment report comparing 9 runs with analysis
+- [ ] MLflow UI screenshots — 5 of 12 captured, see [docs/screenshots/](docs/screenshots/)
 - [x] Bonus: extra metrics (MSE, MAPE, coverage, training time), cold-start
       diagnostics, `load_registered_model()`, stage auto-archiving
