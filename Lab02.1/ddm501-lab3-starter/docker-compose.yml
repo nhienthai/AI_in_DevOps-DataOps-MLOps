@@ -1,0 +1,101 @@
+# =============================================================================
+# Docker Compose configuration for Movie Rating Prediction API
+# DDM501 - Lab 3: Testing & CI/CD
+#
+# Carried over from Lab 1 so the stack under test is the stack that ships.
+#
+# Services:
+#   api         - FastAPI prediction service
+#   redis       - prediction cache
+#   prometheus  - scrapes /metrics from the API
+#
+# Usage:
+#   python scripts/train_model.py     # the image is model-free; models/ is mounted
+#   docker compose up --build
+# =============================================================================
+
+services:
+  api:
+    build: .
+    image: ddm501-movie-rating-api:1.0.0
+    container_name: ddm501-lab3-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # The trained model lives on the host; the image stays model-free.
+      - ./models:/app/models
+    environment:
+      - MODEL_PATH=/app/models/svd_model.pkl
+      - MODEL_VERSION=1.0.0
+      # Cache is off by default in app/config.py; the compose stack turns it on.
+      - CACHE_ENABLED=true
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_TTL_SECONDS=3600
+      - METRICS_ENABLED=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      # No curl in the image (multi-stage slim runtime), so use the interpreter.
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          sys.exit(0 if urllib.request.urlopen("http://localhost:8000/health", timeout=5).status == 200 else 1)
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Redis - caches predictions keyed by model version + user + movie
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: ddm501-lab3-redis
+    ports:
+      - "6379:6379"
+    # Cache entries are disposable, so cap memory and evict the coldest keys
+    # instead of letting Redis grow without bound or start refusing writes.
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Prometheus - scrapes GET /metrics on the API every 15s
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: ddm501-lab3-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+  prometheus_data:

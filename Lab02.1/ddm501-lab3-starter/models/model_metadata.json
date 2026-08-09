@@ -1,0 +1,22 @@
+{
+  "model_type": "SVD (Collaborative Filtering)",
+  "backend": "local",
+  "trained_at": "2026-08-09T03:41:50.058622+00:00",
+  "metrics": {
+    "rmse": 0.9439885863857554,
+    "mae": 0.7452507381529077,
+    "cv_folds": 3
+  },
+  "training_set": {
+    "dataset": "MovieLens 100K",
+    "n_users": 943,
+    "n_items": 1682,
+    "n_ratings": 100000
+  },
+  "hyperparameters": {
+    "n_factors": 50,
+    "n_epochs": 20,
+    "lr_all": 0.005,
+    "reg_all": 0.02
+  }
+}

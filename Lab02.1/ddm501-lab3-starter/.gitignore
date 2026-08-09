@@ -24,6 +24,7 @@ build/
 .coverage
 htmlcov/
 coverage.xml
+junit.xml
 *.cover
 
 # Type checking
@@ -34,7 +35,9 @@ models/*.pkl
 !models/.gitkeep
 
 # Data
-data/
+# Anchored with a leading slash: a bare `data/` also matches tests/data/, which
+# would silently drop the entire data-test package from the repository.
+/data/
 *.csv
 
 # Logs

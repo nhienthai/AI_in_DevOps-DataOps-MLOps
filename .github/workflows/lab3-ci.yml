@@ -1,53 +1,54 @@
 # =============================================================================
-# CI Pipeline for Movie Rating API
+# Lab 3 CI - monorepo entry point
 # DDM501 - Lab 3: Testing & CI/CD
 #
-# Pipeline shape:
-#
-#   lint ─┐
-#         ├─> test (3.10, 3.11) ─> model-validation ─> build
-#   type ─┘
-#
-# Fast, cheap checks gate the slow ones: linting and type checking finish in
-# seconds and stop a bad commit before anyone pays for a training run.
+# GitHub Actions only executes workflows found in `.github/workflows/` at the
+# ROOT of the repository. The lab's own copy lives at
+# `Lab02.1/ddm501-lab3-starter/.github/workflows/ci.yml` (which is what runs if
+# that folder is pushed as a standalone repo); this file is the version that
+# actually runs in this monorepo. Keep the two in sync.
 # =============================================================================
 
-name: CI Pipeline
+name: Lab3 CI
 
 on:
   push:
     branches: [main, develop]
+    paths:
+      - "Lab02.1/ddm501-lab3-starter/**"
+      - ".github/workflows/lab3-ci.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "Lab02.1/ddm501-lab3-starter/**"
+      - ".github/workflows/lab3-ci.yml"
   workflow_dispatch:
 
-# A new push to the same branch cancels the previous run - no point paying for
-# CI on a commit nobody will merge.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: lab3-ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  PYTHON_DEFAULT: "3.10"
+  LAB_DIR: Lab02.1/ddm501-lab3-starter
+
+defaults:
+  run:
+    working-directory: Lab02.1/ddm501-lab3-starter
 
 jobs:
   # ===========================================================================
-  # Linting Job
+  # Linting
   # ===========================================================================
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_DEFAULT }}
-          cache: pip
-          cache-dependency-path: requirements-dev.txt
+          python-version: "3.10"
 
       - name: Install linters
         run: |
@@ -64,36 +65,30 @@ jobs:
         run: isort --check-only --diff app/ tests/ scripts/ training/
 
   # ===========================================================================
-  # Type Checking Job
+  # Type checking
   # ===========================================================================
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_DEFAULT }}
-          cache: pip
+          python-version: "3.10"
 
       - name: Install dependencies
-        # Only what mypy needs to resolve imports - scikit-surprise is a source
-        # build and irrelevant to type checking.
         run: |
           python -m pip install --upgrade pip
-          pip install mypy==1.8.0 types-requests
+          pip install mypy==1.8.0 types-requests pandas-stubs
           pip install fastapi==0.104.1 pydantic==2.5.2 pandas==2.1.3 numpy==1.26.4
-          pip install pandas-stubs
 
       - name: Run mypy
         run: mypy app/ training/ scripts/ --ignore-missing-imports
 
   # ===========================================================================
-  # Test Job
+  # Tests
   # ===========================================================================
   test:
     name: Run Tests (py${{ matrix.python-version }})
@@ -123,21 +118,13 @@ jobs:
       TEST_REDIS_URL: redis://localhost:6379/0
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
 
       - name: Cache MovieLens dataset
-        # ~5 MB download from grouplens.org; caching keeps CI independent of
-        # that host being up and saves a download on every run.
         uses: actions/cache@v4
         with:
           path: ~/.surprise_data
@@ -150,8 +137,6 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Train model
-        # --backend auto uses scikit-surprise on Linux and falls back to the
-        # NumPy implementation if the C extension is unavailable.
         run: python scripts/train_model.py --backend auto --cv 3
 
       - name: Validate model quality
@@ -173,8 +158,8 @@ jobs:
         with:
           name: coverage-report-py${{ matrix.python-version }}
           path: |
-            htmlcov/
-            coverage.xml
+            Lab02.1/ddm501-lab3-starter/htmlcov/
+            Lab02.1/ddm501-lab3-starter/coverage.xml
           retention-days: 14
 
       - name: Upload test results
@@ -182,29 +167,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-py${{ matrix.python-version }}
-          path: junit.xml
+          path: Lab02.1/ddm501-lab3-starter/junit.xml
           retention-days: 14
 
       - name: Upload trained model
-        # Hand the artifact to the build job so the image ships with a model
-        # instead of rebuilding one.
         if: matrix.python-version == '3.10'
         uses: actions/upload-artifact@v4
         with:
           name: trained-model
-          path: models/
+          path: Lab02.1/ddm501-lab3-starter/models/
           retention-days: 7
 
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.10'
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
-        continue-on-error: true
-
   # ===========================================================================
-  # Build Job
+  # Docker build + smoke test
   # ===========================================================================
   build:
     name: Build Docker Image
@@ -212,14 +187,13 @@ jobs:
     needs: [test]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Download trained model
         uses: actions/download-artifact@v4
         with:
           name: trained-model
-          path: models/
+          path: Lab02.1/ddm501-lab3-starter/models/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -227,7 +201,7 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: Lab02.1/ddm501-lab3-starter
           push: false
           load: true
           tags: movie-rating-api:ci
@@ -235,8 +209,6 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Smoke test the image
-        # A build that succeeds but serves 503 is still a broken release, so the
-        # check is on /health reporting a loaded model - not just on HTTP 200.
         run: |
           docker run -d -p 8000:8000 --name ci-api movie-rating-api:ci
           for attempt in $(seq 1 20); do
@@ -245,7 +217,6 @@ jobs:
           done
           curl -sf http://localhost:8000/health | tee health.json
           grep -q '"model_loaded":true' health.json
-
           curl -sf -X POST http://localhost:8000/predict \
             -H 'Content-Type: application/json' \
             -d '{"user_id":"196","movie_id":"242"}' | tee predict.json
@@ -260,7 +231,7 @@ jobs:
         run: docker rm -f ci-api || true
 
   # ===========================================================================
-  # Aggregate status - a single required check for branch protection
+  # Aggregate status
   # ===========================================================================
   ci-status:
     name: CI Status

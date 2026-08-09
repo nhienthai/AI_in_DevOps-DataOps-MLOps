@@ -1,0 +1,33 @@
+# =============================================================================
+# Flake8 configuration
+# DDM501 - Lab 3: Testing & CI/CD
+#
+# Flake8 does not read pyproject.toml, so its settings live here and must stay
+# consistent with [tool.black] / [tool.isort] in pyproject.toml.
+# =============================================================================
+
+[flake8]
+max-line-length = 100
+
+# E203: whitespace before ':' - conflicts with black's slice formatting
+# W503: line break before binary operator - black puts the operator first
+extend-ignore = E203, W503
+
+exclude =
+    .git,
+    __pycache__,
+    venv,
+    .venv,
+    build,
+    dist,
+    *.egg-info,
+    htmlcov,
+    .pytest_cache,
+    .mypy_cache
+
+# Tests are allowed longer, more descriptive names and unused imports in
+# fixtures; keep the complexity gate on application code only.
+max-complexity = 12
+
+per-file-ignores =
+    tests/*:D
