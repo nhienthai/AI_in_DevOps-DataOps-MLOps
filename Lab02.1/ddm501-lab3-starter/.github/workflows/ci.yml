@@ -40,10 +40,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_DEFAULT }}
           cache: pip
@@ -72,10 +72,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_DEFAULT }}
           cache: pip
@@ -136,10 +136,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -150,7 +150,7 @@ jobs:
       - name: Cache MovieLens dataset
         # ~5 MB download from grouplens.org; caching keeps CI independent of
         # that host being up and saves a download on every run.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.surprise_data
           key: movielens-100k-v1
@@ -181,7 +181,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report-py${{ matrix.python-version }}
           path: |
@@ -191,7 +191,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-py${{ matrix.python-version }}
           path: junit.xml
@@ -201,7 +201,7 @@ jobs:
         # Hand the artifact to the build job so the image ships with a model
         # instead of rebuilding one.
         if: matrix.python-version == '3.10'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trained-model
           path: models/
@@ -209,7 +209,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.10'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
@@ -225,19 +225,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download trained model
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: trained-model
           path: models/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
