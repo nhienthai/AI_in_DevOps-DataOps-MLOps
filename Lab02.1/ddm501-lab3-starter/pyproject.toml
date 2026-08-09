@@ -67,7 +67,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --strict-markers"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
@@ -93,3 +93,9 @@ exclude_lines = [
     "if __name__ == .__main__.:",
 ]
 show_missing = true
+# Deliverable requires >= 80%; CI passes --cov-fail-under=80 explicitly so the
+# gate is visible in the workflow log too.
+fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"

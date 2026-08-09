@@ -2,15 +2,21 @@
 # Pre-commit hooks configuration
 # DDM501 - Lab 3: Testing & CI/CD
 #
-# TODO: Complete this configuration
+# The hooks mirror the CI `lint` and `type-check` jobs, at the same pinned
+# versions. That is the point: a commit that passes locally passes in CI, and a
+# formatting disagreement between the two can never happen.
 #
 # Setup:
 #   pip install pre-commit
 #   pre-commit install
+#   pre-commit install --hook-type pre-push
 #
 # Run manually:
 #   pre-commit run --all-files
 # =============================================================================
+
+default_language_version:
+  python: python3
 
 repos:
   # ===========================================================================
@@ -23,60 +29,78 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+      - id: check-toml
       - id: check-added-large-files
-        args: ['--maxkb=1000']
+        args: ["--maxkb=1000"]
       - id: check-merge-conflict
       - id: detect-private-key
+      - id: debug-statements
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
 
   # ===========================================================================
-  # TODO 1: Add Black formatter
+  # Black formatter
   # ===========================================================================
-  # - repo: https://github.com/psf/black
-  #   rev: 23.12.1
-  #   hooks:
-  #     - id: black
-  #       language_version: python3.10
-  #       args: ['--line-length=100']
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        args: ["--line-length=100"]
 
   # ===========================================================================
-  # TODO 2: Add isort for import sorting
+  # isort for import sorting
   # ===========================================================================
-  # - repo: https://github.com/pycqa/isort
-  #   rev: 5.13.2
-  #   hooks:
-  #     - id: isort
-  #       args: ['--profile=black', '--line-length=100']
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile=black", "--line-length=100"]
 
   # ===========================================================================
-  # TODO 3: Add Flake8 linter
+  # Flake8 linter
   # ===========================================================================
-  # - repo: https://github.com/pycqa/flake8
-  #   rev: 7.0.0
-  #   hooks:
-  #     - id: flake8
-  #       args: ['--max-line-length=100', '--exclude=__pycache__,venv']
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        # Settings come from .flake8 so the hook and `flake8 .` agree.
+        args: ["--config=.flake8"]
 
   # ===========================================================================
-  # TODO 4: Add mypy type checker (BONUS)
+  # mypy type checker
   # ===========================================================================
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.8.0
-  #   hooks:
-  #     - id: mypy
-  #       additional_dependencies:
-  #         - types-requests
-  #         - pydantic
-  #       args: ['--ignore-missing-imports']
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        files: ^(app|training|scripts)/
+        additional_dependencies:
+          - types-requests
+          - pydantic==2.5.2
+        args: ["--ignore-missing-imports"]
 
   # ===========================================================================
-  # TODO 5: Add pytest hook (BONUS)
+  # Fast tests on commit, full suite on push
   # ===========================================================================
-  # This runs tests before every commit (can be slow)
-  # - repo: local
-  #   hooks:
-  #     - id: pytest
-  #       name: pytest
-  #       entry: pytest tests/unit/ -v --tb=short
-  #       language: system
-  #       pass_filenames: false
-  #       always_run: true
+  - repo: local
+    hooks:
+      # Unit + data tests only: they need no model artifact and finish in
+      # under a second, so the commit loop stays fast.
+      - id: pytest-fast
+        name: pytest (unit + data)
+        entry: pytest tests/unit tests/data -q --no-cov
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      # The full suite, including integration and behavioural tests, runs
+      # before the code leaves the machine.
+      - id: pytest-full
+        name: pytest (full suite with coverage gate)
+        entry: pytest tests/ -q --cov=app --cov-fail-under=80
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
