@@ -2,6 +2,7 @@
 
 import argparse
 import concurrent.futures
+import os
 import random
 import statistics
 import time
@@ -10,7 +11,7 @@ from typing import Callable, List, Tuple
 import requests
 
 
-API_URL = "http://localhost:8000"
+API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 
 
 def make_single_prediction() -> Tuple[bool, float]:
@@ -56,7 +57,14 @@ def check_health() -> bool:
     """Check if the API is healthy."""
     try:
         response = requests.get(f"{API_URL}/health", timeout=5)
-        return response.status_code == 200
+        if response.status_code != 200:
+            return False
+
+        payload = response.json()
+        return (
+            payload.get("status") == "healthy"
+            and payload.get("model_loaded") is True
+        )
     except Exception:
         return False
 
@@ -211,7 +219,14 @@ def run_spike_test(
 
 
 def main():
+    global API_URL
+
     parser = argparse.ArgumentParser(description="Load test the Movie Rating API")
+    parser.add_argument(
+        "--url",
+        default=API_URL,
+        help="API base URL (default: API_URL env or http://localhost:8000)",
+    )
     parser.add_argument("--duration", type=int, default=60, help="Test duration in seconds")
     parser.add_argument("--workers", type=int, default=10, help="Number of concurrent workers")
     parser.add_argument("--batch", action="store_true", help="Use batch predictions")
@@ -224,6 +239,7 @@ def main():
     )
 
     args = parser.parse_args()
+    API_URL = args.url.rstrip("/")
 
     if args.variable:
         run_variable_load(args.duration, args.workers, args.allow_unhealthy)

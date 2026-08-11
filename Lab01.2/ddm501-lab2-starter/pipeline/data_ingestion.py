@@ -40,7 +40,9 @@ def load_data(dataset_name: str = DATASET_NAME) -> Any:
     logger.info(f"Loading dataset: {dataset_name}")
     
     try:
-        data = Dataset.load_builtin(dataset_name)
+        # Airflow tasks run without an interactive stdin. Download directly on
+        # a fresh worker instead of waiting for a confirmation prompt.
+        data = Dataset.load_builtin(dataset_name, prompt=False)
         logger.info(f"Dataset '{dataset_name}' loaded successfully")
         return data
     except Exception as e:
