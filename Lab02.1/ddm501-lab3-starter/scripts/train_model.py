@@ -77,6 +77,11 @@ def train_with_surprise(cv_folds: int) -> Tuple[Any, Dict[str, float]]:
     from surprise.model_selection import cross_validate
 
     print("\n[1/4] Loading MovieLens 100K dataset (scikit-surprise)...")
+    # Populate surprise's own cache directory ourselves. Its downloader has no
+    # retry, no mirror and no checksum, so an upstream TLS hiccup fails the run;
+    # dataset.ensure_ml100k writes to exactly the path load_builtin looks for,
+    # which then finds the file already there and skips downloading entirely.
+    dataset.ensure_ml100k()
     # prompt=False matters in CI: the interactive download prompt would hang.
     data = Dataset.load_builtin("ml-100k", prompt=False)
     print("      Dataset loaded successfully!")
