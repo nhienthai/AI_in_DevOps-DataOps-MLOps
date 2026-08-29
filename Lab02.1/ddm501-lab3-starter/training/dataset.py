@@ -83,7 +83,9 @@ def _download(url: str) -> bytes:
     """
     try:
         with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as response:
-            return response.read()
+            # urlopen is typed as returning Any, so pin the payload type here.
+            payload: bytes = response.read()
+        return payload
     except (urllib.error.URLError, ssl.SSLError) as exc:
         cert_error = _certificate_error(exc)
         if cert_error is None:
@@ -94,7 +96,8 @@ def _download(url: str) -> bytes:
         )
         context = ssl._create_unverified_context()
         with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT, context=context) as response:
-            return response.read()
+            fallback_payload: bytes = response.read()
+        return fallback_payload
 
 
 def _fetch_archive() -> bytes:
