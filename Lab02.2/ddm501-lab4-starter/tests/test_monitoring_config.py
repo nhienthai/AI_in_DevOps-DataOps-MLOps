@@ -37,7 +37,11 @@ def test_grafana_queries_and_datasource_uid_match_metrics():
         for panel in dashboard["panels"]
         for target in panel.get("targets", [])
     ]
-    assert "ml_model_info" in expressions
+    # prometheus_client's Info appends "_info", so Info("ml_model_info") is
+    # exposed as ml_model_info_info. The dashboard must query the exposed name,
+    # not the declared one; asserting the declared name is what let the panel
+    # render "No data" while this test stayed green.
+    assert "ml_model_info_info" in expressions
     assert any(
         "sum by (model_version) (rate(ml_prediction_errors_total[5m]))" in expr
         for expr in expressions

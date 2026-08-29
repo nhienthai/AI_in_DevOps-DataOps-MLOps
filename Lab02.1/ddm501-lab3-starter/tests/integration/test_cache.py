@@ -302,6 +302,17 @@ class TestApiUsesTheCache:
         """A miss computes the rating and stores it, so the next call hits."""
         writes: list = []
 
+        # The sibling hit-test stubs the model; this one did not, so it was the
+        # only test in the file that needed a trained svd_model.pkl on disk.
+        # Without it /predict answers 503 and the test fails rather than skips,
+        # which makes a fresh clone look broken instead of untrained.
+        class StubModel:
+            def is_loaded(self) -> bool:
+                return True
+
+            def predict(self, user_id: str, movie_id: str) -> float:
+                return 3.75
+
         class MissCache:
             enabled = True
 
@@ -314,11 +325,14 @@ class TestApiUsesTheCache:
             def is_connected(self) -> bool:
                 return True
 
+        monkeypatch.setattr("app.main.model", StubModel())
         monkeypatch.setattr("app.main.cache", MissCache())
 
         response = test_client.post("/predict", json=sample_prediction_request)
         assert response.status_code == 200
         assert len(writes) == 1
+        # Written value is the model's output, not merely whatever was returned.
+        assert writes[0][2] == 3.75
         assert writes[0][2] == response.json()["predicted_rating"]
 
     def test_health_reports_cache_connected(
