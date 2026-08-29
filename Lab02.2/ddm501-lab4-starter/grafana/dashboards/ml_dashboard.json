@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -8,14 +10,23 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "mappings": [
             {
               "options": {
-                "0": { "color": "red", "text": "Not Loaded" },
-                "1": { "color": "green", "text": "Loaded" }
+                "0": {
+                  "color": "red",
+                  "text": "Not Loaded"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "Loaded"
+                }
               },
               "type": "value"
             }
@@ -23,113 +34,386 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "ml_model_loaded", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "ml_model_loaded",
+          "refId": "A"
+        }
       ],
       "title": "Model Status",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "min": 1, "max": 5, "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 1,
+          "max": 5,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
       "id": 2,
-      "options": { "showThresholdLabels": false, "showThresholdMarkers": true },
+      "options": {
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.5, rate(ml_prediction_value_bucket[5m]))", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(ml_prediction_value_sum[30m])) / clamp_min(sum(rate(ml_prediction_value_count[30m])), 0.000001)",
+          "refId": "A"
+        }
       ],
       "title": "Average Prediction",
       "type": "gauge"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "id": 3,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_predictions_total[5m])", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(ml_predictions_total[5m])",
+          "refId": "A"
+        }
       ],
       "title": "Prediction Rate",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "id": 4,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_prediction_errors_total[5m]) / clamp_min(rate(ml_predictions_total[5m]), 0.000001)", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(sum(rate(ml_prediction_errors_total[5m])) or vector(0)) / clamp_min(sum(rate(ml_predictions_total[5m])), 0.000001)",
+          "refId": "A"
+        }
       ],
       "title": "Error Rate",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
       "id": 5,
-      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_predictions_total[5m])", "legendFormat": "predictions", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(ml_predictions_total[5m])",
+          "legendFormat": "predictions",
+          "refId": "A"
+        }
       ],
       "title": "Prediction Rate Over Time",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
       "id": 6,
-      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.50, rate(ml_prediction_duration_seconds_bucket[5m]))", "legendFormat": "P50", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m]))", "legendFormat": "P95", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "histogram_quantile(0.99, rate(ml_prediction_duration_seconds_bucket[5m]))", "legendFormat": "P99", "refId": "C" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.50, rate(ml_prediction_duration_seconds_bucket[5m]))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m]))",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, rate(ml_prediction_duration_seconds_bucket[5m]))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
       ],
       "title": "Prediction Latency",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
       "id": 7,
-      "options": { "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_prediction_value_bucket[5m])", "legendFormat": "<= {{le}}", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(ml_prediction_value_bucket[5m])",
+          "legendFormat": "<= {{le}}",
+          "refId": "A"
+        }
       ],
       "title": "Prediction Value Distribution",
       "type": "histogram"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
       "id": 8,
-      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "single" } },
+      "options": {
+        "legend": {
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "rate(ml_prediction_errors_total[5m])", "legendFormat": "{{error_type}}", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(sum(rate(ml_prediction_errors_total[5m])) or vector(0)) / clamp_min(sum(rate(ml_predictions_total[5m])), 0.000001)",
+          "legendFormat": "{{error_type}}",
+          "refId": "A"
+        }
       ],
       "title": "Prediction Errors",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
       "id": 9,
-      "options": { "showHeader": true },
+      "options": {
+        "showHeader": true
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "ml_model_info", "format": "table", "instant": true, "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "ml_model_info_info",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
       ],
       "title": "Model Info",
       "transformations": [
-        { "id": "labelsToFields", "options": {} }
+        {
+          "id": "labelsToFields",
+          "options": {}
+        }
       ],
       "type": "table"
     }
@@ -137,9 +421,18 @@
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["ml", "model", "ddm501"],
-  "templating": { "list": [] },
-  "time": { "from": "now-1h", "to": "now" },
+  "tags": [
+    "ml",
+    "model",
+    "ddm501"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "",
   "title": "ML Metrics Dashboard",

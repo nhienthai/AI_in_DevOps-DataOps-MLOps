@@ -2,6 +2,7 @@
 
 import argparse
 import concurrent.futures
+import os
 import random
 import statistics
 import time
@@ -10,7 +11,9 @@ from typing import Callable, List, Tuple
 import requests
 
 
-API_URL = "http://localhost:8000"
+# Overridable so the same script can target a container, a staging host, or a
+# stack brought up on a non-default port.
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 
 def make_single_prediction() -> Tuple[bool, float]:

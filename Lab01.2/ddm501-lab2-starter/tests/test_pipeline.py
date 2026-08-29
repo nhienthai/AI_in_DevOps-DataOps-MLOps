@@ -315,23 +315,42 @@ class TestRegistry:
                 register_model("some-run-id", "some-model")
 
     @pytest.mark.slow
-    def test_find_best_run_returns_lowest_rmse(self):
-        """The best run really is the minimum, verified against all runs."""
-        from mlflow.tracking import MlflowClient
+    def test_find_best_run_returns_lowest_rmse(self, experiment_name):
+        """The best run is the minimum — checked against runs this test created.
+
+        The earlier version of this test queried whatever runs already existed in
+        the shared experiment. That made it pass or fail depending on who had run
+        what beforehand, and it could not fail at all if the experiment was empty.
+        Seeding known values is what makes the assertion mean something.
+        """
+        import mlflow
         from pipeline.registry import find_best_run
-        from pipeline.config import MLFLOW_EXPERIMENT_NAME
 
-        best = find_best_run(MLFLOW_EXPERIMENT_NAME, metric="rmse")
+        mlflow.set_experiment(experiment_name)
+        seeded = {"seed_worst": 1.30, "seed_best": 0.87, "seed_middle": 1.05}
+        for name, rmse in seeded.items():
+            with mlflow.start_run(run_name=name):
+                mlflow.log_metric("rmse", rmse)
+                mlflow.log_metric("mae", rmse * 0.8)
 
-        client = MlflowClient()
-        experiment = client.get_experiment_by_name(MLFLOW_EXPERIMENT_NAME)
-        all_rmse = [
-            r.data.metrics["rmse"]
-            for r in client.search_runs([experiment.experiment_id])
-            if "rmse" in r.data.metrics
-        ]
+        best = find_best_run(experiment_name, metric="rmse")
 
-        assert best["metrics"]["rmse"] == pytest.approx(min(all_rmse))
+        assert best["metrics"]["rmse"] == pytest.approx(min(seeded.values()))
+        assert best["metrics"]["rmse"] == pytest.approx(0.87)
+
+    def test_find_best_run_rejects_empty_experiment(self):
+        """An experiment with no scored run must fail loudly, not return None.
+
+        Silently returning nothing here would let the registration step promote
+        "the best model" when there is no model at all.
+        """
+        import mlflow
+        from pipeline.registry import find_best_run
+
+        mlflow.set_experiment("empty-experiment-for-tests")
+
+        with pytest.raises(ValueError, match="rmse"):
+            find_best_run("empty-experiment-for-tests", metric="rmse")
 
 
 class TestConfig:
@@ -424,20 +443,73 @@ class TestExperimentRunner:
 class TestDag:
     """The DAG file is a deliverable; check it without needing Airflow installed."""
 
-    def test_dag_file_defines_expected_tasks(self):
-        """All seven tasks and the dependency chain are present."""
+    @staticmethod
+    def _dag_source():
+        """Return the DAG source text and its parsed AST.
+
+        The file is read rather than imported so these checks run without Airflow
+        installed, and parsed rather than grepped so a mention inside a comment or
+        docstring can never satisfy an assertion.
+        """
+        import ast
         from pathlib import Path
 
         source = Path(__file__).resolve().parent.parent / "dags" / "ml_training_dag.py"
         text = source.read_text()
+        return text, ast.parse(text)
 
-        for task_id in ("load_data", "preprocess_data", "train_model",
-                        "evaluate_model", "decide_registration",
-                        "register_model", "skip_registration", "cleanup"):
-            assert f"'{task_id}'" in text, f"task {task_id} missing from the DAG"
+    def test_dag_file_defines_expected_tasks(self):
+        """All eight tasks and the dependency chain are present."""
+        text, tree = self._dag_source()
+        import ast
+
+        declared = {
+            kw.value.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            for kw in node.keywords
+            if kw.arg == "task_id" and isinstance(kw.value, ast.Constant)
+        }
+        expected = {"load_data", "preprocess_data", "train_model",
+                    "evaluate_model", "decide_registration",
+                    "register_model", "skip_registration", "cleanup"}
+        assert expected <= declared, f"missing tasks: {sorted(expected - declared)}"
 
         assert "t_load_data >> t_preprocess >> t_train >> t_evaluate >> t_decide" in text
-        assert "schedule_interval='@weekly'" in text
+
+    def test_dag_uses_the_current_scheduling_parameter(self):
+        """`schedule`, not the `schedule_interval` removed in Airflow 3.
+
+        Asserted against the parsed keyword rather than the source text, so the
+        explanatory comment next to it — which names the old parameter — cannot
+        make this pass on its own.
+        """
+        import ast
+
+        _, tree = self._dag_source()
+        kwargs = {
+            kw.arg: kw.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            for kw in node.keywords
+        }
+        assert "schedule_interval" not in kwargs, "schedule_interval is removed in Airflow 3"
+        assert isinstance(kwargs.get("schedule"), ast.Constant)
+        assert kwargs["schedule"].value == "@weekly"
+
+    def test_dag_uses_empty_operator_not_dummy(self):
+        """DummyOperator was removed in Airflow 2.9; EmptyOperator replaces it."""
+        import ast
+
+        _, tree = self._dag_source()
+        imported = {
+            f"{node.module}.{alias.name}"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+            for alias in node.names
+        }
+        assert "airflow.operators.empty.EmptyOperator" in imported
+        assert "airflow.operators.dummy.DummyOperator" not in imported
 
     def test_dag_has_no_unimplemented_stubs(self):
         """No task function was left as a bare `pass`."""

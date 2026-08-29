@@ -23,7 +23,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator, BranchPythonOperator
-from airflow.operators.dummy import DummyOperator
+# EmptyOperator, not the old DummyOperator: airflow.operators.dummy was
+# deprecated in Airflow 2.0 and removed in 2.9, so the old import breaks on
+# any upgrade of the pinned 2.8.0 image.
+from airflow.operators.empty import EmptyOperator
 
 # =============================================================================
 # Default Arguments
@@ -47,7 +50,9 @@ dag = DAG(
     'movie_rating_training',
     default_args=default_args,
     description='ML Training Pipeline for Movie Rating Prediction',
-    schedule_interval='@weekly',  # Or '0 0 * * 0' for every Sunday
+    # `schedule`, not `schedule_interval`: the latter is deprecated since
+    # Airflow 2.4 and removed in Airflow 3.
+    schedule='@weekly',  # or '0 0 * * 0' for every Sunday
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=['ml', 'training', 'movie-rating'],
@@ -316,7 +321,7 @@ t_register = PythonOperator(
 )
 
 # Task 6b: Skip Registration
-t_skip = DummyOperator(
+t_skip = EmptyOperator(
     task_id='skip_registration',
     dag=dag,
 )

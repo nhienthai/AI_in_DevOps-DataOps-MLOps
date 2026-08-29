@@ -29,7 +29,7 @@ from app.schemas import (
     MetricsInfo,
 )
 from app.middleware import MetricsMiddleware
-from app.metrics import count_implemented_metrics
+from app.metrics import BATCH_SIZE, count_implemented_metrics
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -183,7 +183,13 @@ async def predict_batch(request: BatchPredictionRequest):
     """
     if model is None or not model.is_loaded():
         raise HTTPException(status_code=503, detail="Model not loaded")
-    
+
+    # Recorded here rather than in ModelWrapper.predict_batch(): this endpoint
+    # loops per item so it can report per-item latency, so predict_batch() is
+    # never called and the histogram would stay empty for ever.
+    if BATCH_SIZE is not None:
+        BATCH_SIZE.observe(len(request.predictions))
+
     try:
         results = []
         total_latency = 0

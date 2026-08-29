@@ -9,15 +9,20 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
+# - build-essential: scikit-surprise ships as an sdist and compiles its Cython
+#   extension at install time, so gcc must exist at pip-install time.
+# - curl: used by the HEALTHCHECK below.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (for cache optimization)
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies, then drop the toolchain again so the runtime
+# image does not ship a compiler it will never use.
+RUN pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y --auto-remove build-essential
 
 # Copy application code
 COPY app/ ./app/
