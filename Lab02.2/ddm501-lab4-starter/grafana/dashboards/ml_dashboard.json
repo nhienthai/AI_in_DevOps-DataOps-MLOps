@@ -368,7 +368,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (error_type) (rate(ml_prediction_errors_total[5m]))",
+          "expr": "sum by (error_type) (rate(ml_prediction_errors_total[5m])) or vector(0)",
           "legendFormat": "{{error_type}}",
           "refId": "A"
         }
