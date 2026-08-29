@@ -92,7 +92,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Useful endpoints:
 
-- `http://localhost:8000/health`
+- `http://localhost:8000/health` (returns HTTP 503 until the model is loaded)
 - `http://localhost:8000/metrics`
 - `http://localhost:8000/docs`
 
@@ -126,6 +126,14 @@ Run a basic load test against the API:
 
 ```bash
 python scripts/load_test.py --duration 60 --workers 10
+```
+
+The script aborts unless `/health` reports both `status=healthy` and
+`model_loaded=true`. Point it at another deployment with `--url` or the
+`API_URL` environment variable:
+
+```bash
+python scripts/load_test.py --url https://api.example.com --duration 60
 ```
 
 Batch mode:

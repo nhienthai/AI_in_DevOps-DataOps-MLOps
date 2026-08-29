@@ -1,18 +1,12 @@
 # =============================================================================
-# CD Pipeline for Movie Rating API
-# DDM501 - Lab 3: Testing & CI/CD
+# Lab 3 CD - monorepo entry point
 #
-# Triggered by a version tag (v1.0.0). Re-runs the full test suite, trains and
-# validates a model, publishes a multi-arch image to Docker Hub and GHCR, then
-# promotes staging -> production behind a manual approval gate.
-#
-# Required repository secrets (Settings > Secrets and variables > Actions):
-#   DOCKER_USERNAME, DOCKER_PASSWORD   - Docker Hub credentials (a token, not
-#                                        the account password)
-# GHCR uses the built-in GITHUB_TOKEN, no secret needed.
+# GitHub only discovers workflows under the repository-root .github/workflows
+# directory. Keep the standalone lab copy in
+# Lab02.1/ddm501-lab3-starter/.github/workflows/cd.yml in sync with this file.
 # =============================================================================
 
-name: CD Pipeline
+name: Lab3 CD
 
 on:
   push:
@@ -21,17 +15,22 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to deploy (e.g. v1.0.0)"
+        description: "Version to deploy (for example v1.0.0)"
         required: true
 
 permissions:
-  contents: write # create GitHub releases
-  packages: write # push to ghcr.io
+  contents: write
+  packages: write
+
+env:
+  LAB_DIR: Lab02.1/ddm501-lab3-starter
+  RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+
+defaults:
+  run:
+    working-directory: Lab02.1/ddm501-lab3-starter
 
 jobs:
-  # ===========================================================================
-  # Gate: never ship an untested tag
-  # ===========================================================================
   verify:
     name: Verify Release
     runs-on: ubuntu-latest
@@ -45,6 +44,9 @@ jobs:
         with:
           python-version: "3.10"
           cache: pip
+          cache-dependency-path: |
+            Lab02.1/ddm501-lab3-starter/requirements.txt
+            Lab02.1/ddm501-lab3-starter/requirements-dev.txt
 
       - name: Cache MovieLens dataset
         uses: actions/cache@v6
@@ -71,12 +73,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-model
-          path: models/
+          path: Lab02.1/ddm501-lab3-starter/models/
           retention-days: 30
 
-  # ===========================================================================
-  # Build and publish the image
-  # ===========================================================================
   build-and-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
@@ -93,7 +92,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: release-model
-          path: models/
+          path: Lab02.1/ddm501-lab3-starter/models/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -120,19 +119,18 @@ jobs:
         with:
           images: |
             ${{ secrets.DOCKER_USERNAME }}/movie-rating-api
-            ghcr.io/${{ github.repository }}
+            ghcr.io/${{ github.repository }}/movie-rating-api
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,value=${{ env.RELEASE_VERSION }},pattern={{version}}
+            type=semver,value=${{ env.RELEASE_VERSION }},pattern={{major}}.{{minor}}
+            type=semver,value=${{ env.RELEASE_VERSION }},pattern={{major}}
             type=sha,format=short
 
       - name: Build and push
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: Lab02.1/ddm501-lab3-starter
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -143,26 +141,20 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_VERSION }}
+          name: Release ${{ env.RELEASE_VERSION }}
           generate_release_notes: true
           body: |
-            ## Movie Rating Prediction API ${{ github.ref_name }}
+            ## Movie Rating Prediction API ${{ env.RELEASE_VERSION }}
 
             Published images:
-            - `${{ secrets.DOCKER_USERNAME }}/movie-rating-api:${{ github.ref_name }}`
-            - `ghcr.io/${{ github.repository }}:${{ github.ref_name }}`
+            - `${{ secrets.DOCKER_USERNAME }}/movie-rating-api:${{ env.RELEASE_VERSION }}`
+            - `ghcr.io/${{ github.repository }}/movie-rating-api:${{ env.RELEASE_VERSION }}`
 
             Digest: `${{ steps.build.outputs.digest }}`
-
-            All CI checks, the model quality gate and the full test suite
-            passed before this image was published.
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          prerelease: ${{ contains(env.RELEASE_VERSION, '-rc') }}
 
-  # ===========================================================================
-  # Deploy to staging
-  # ===========================================================================
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
@@ -173,22 +165,17 @@ jobs:
 
     steps:
       - name: Deploy
-        # Replace with the real deployment command for your platform, e.g.
-        #   aws ecs update-service --cluster prod --service api --force-new-deployment
-        #   kubectl set image deploy/api api=$IMAGE --namespace staging
+        working-directory: .
         run: |
-          echo "Deploying ${{ github.ref_name }} to staging..."
+          echo "Deploying ${{ env.RELEASE_VERSION }} to staging..."
           echo "Image digest: ${{ needs.build-and-push.outputs.image-digest }}"
 
       - name: Smoke test staging
+        working-directory: .
         run: |
           echo "Checking /health on staging..."
-          # curl -sf https://staging.movie-rating-api.example.com/health
+          # Replace with: curl -sf https://staging.movie-rating-api.example.com/health
 
-  # ===========================================================================
-  # Deploy to production (requires manual approval on the 'production'
-  # environment - configure reviewers in Settings > Environments)
-  # ===========================================================================
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
@@ -199,20 +186,19 @@ jobs:
 
     steps:
       - name: Deploy
-        run: |
-          echo "Deploying ${{ github.ref_name }} to production..."
+        working-directory: .
+        run: echo "Deploying ${{ env.RELEASE_VERSION }} to production..."
 
       - name: Smoke test production
         id: smoke
+        working-directory: .
         run: |
           echo "Checking /health on production..."
-          # curl -sf https://movie-rating-api.example.com/health
+          # Replace with: curl -sf https://movie-rating-api.example.com/health
 
       - name: Roll back on failure
         if: failure()
-        # Rollback is a first-class step, not an afterthought: the image is
-        # immutable and previous tags stay published, so reverting is a redeploy
-        # of the prior tag.
+        working-directory: .
         run: |
           echo "Deployment failed - rolling back to the previous release..."
-          # kubectl rollout undo deploy/api --namespace production
+          # Replace with the rollback command for the chosen platform.

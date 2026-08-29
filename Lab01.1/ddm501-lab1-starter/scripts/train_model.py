@@ -39,7 +39,9 @@ def main():
     # Step 1: Load data
     # ==========================================================================
     print("\n[1/4] Loading MovieLens 100K dataset...")
-    data = Dataset.load_builtin('ml-100k')
+    # CI and containers do not have an interactive stdin. Surprise asks before
+    # downloading by default, which makes a clean automated run fail with EOF.
+    data = Dataset.load_builtin('ml-100k', prompt=False)
     print("      Dataset loaded successfully!")
     print(f"      - This dataset contains 100,000 ratings")
     print(f"      - From 943 users on 1,682 movies")

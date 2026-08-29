@@ -26,7 +26,8 @@ def main():
     
     # Load data
     print("\n[1/4] Loading MovieLens 100K dataset...")
-    data = Dataset.load_builtin('ml-100k')
+    # Training is also executed in CI/containers where stdin is unavailable.
+    data = Dataset.load_builtin('ml-100k', prompt=False)
     print("      Dataset loaded successfully!")
     
     # Define model

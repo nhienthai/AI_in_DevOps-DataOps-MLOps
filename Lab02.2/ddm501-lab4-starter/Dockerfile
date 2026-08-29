@@ -3,26 +3,37 @@
 # DDM501 - Lab 4: Monitoring & Production Deployment
 # =============================================================================
 
+FROM python:3.10-slim AS builder
+
+WORKDIR /build
+
+# scikit-surprise is distributed as source and needs a compiler to build its
+# wheel. Keep the toolchain out of the final runtime image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+
+
 FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
 
 # Install system dependencies
-# - build-essential: scikit-surprise ships as an sdist and compiles its Cython
-#   extension at install time, so gcc must exist at pip-install time.
-# - curl: used by the HEALTHCHECK below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (for cache optimization)
 COPY requirements.txt .
 
-# Install Python dependencies, then drop the toolchain again so the runtime
-# image does not ship a compiler it will never use.
-RUN pip install --no-cache-dir -r requirements.txt \
-    && apt-get purge -y --auto-remove build-essential
+# Install the pre-built wheels without carrying a compiler into production.
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
+    && rm -rf /wheels
 
 # Copy application code
 COPY app/ ./app/

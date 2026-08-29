@@ -1,6 +1,6 @@
 """Prometheus metrics definitions for the Movie Rating API."""
 
-from prometheus_client import Counter, Histogram, Gauge, Info
+from prometheus_client import Counter, Gauge, Histogram, Info
 
 
 REQUEST_COUNT = Counter(
@@ -48,7 +48,10 @@ MODEL_LOADED = Gauge(
 )
 
 MODEL_INFO = Info(
-    "ml_model_info",
+    # Info automatically appends the `_info` suffix. Using `ml_model_info`
+    # here produced `ml_model_info_info`, while the dashboard queried
+    # `ml_model_info`.
+    "ml_model",
     "Information about the loaded ML model",
 )
 

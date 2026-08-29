@@ -144,7 +144,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(ml_predictions_total[5m])",
+          "expr": "sum(rate(ml_predictions_total[5m]))",
           "refId": "A"
         }
       ],
@@ -190,7 +190,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(ml_prediction_errors_total[5m])) or vector(0)) / clamp_min(sum(rate(ml_predictions_total[5m])), 0.000001)",
+          "expr": "(sum by (model_version) (rate(ml_prediction_errors_total[5m])) or (0 * sum by (model_version) (rate(ml_predictions_total[5m])))) / clamp_min(sum by (model_version) (rate(ml_predictions_total[5m])) + (sum by (model_version) (rate(ml_prediction_errors_total[5m])) or (0 * sum by (model_version) (rate(ml_predictions_total[5m])))), 0.000001)",
           "refId": "A"
         }
       ],
@@ -228,7 +228,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(ml_predictions_total[5m])",
+          "expr": "sum(rate(ml_predictions_total[5m]))",
           "legendFormat": "predictions",
           "refId": "A"
         }
@@ -269,7 +269,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, rate(ml_prediction_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(ml_prediction_duration_seconds_bucket[5m])))",
           "legendFormat": "P50",
           "refId": "A"
         },
@@ -279,7 +279,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(ml_prediction_duration_seconds_bucket[5m])))",
           "legendFormat": "P95",
           "refId": "B"
         },
@@ -289,7 +289,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, rate(ml_prediction_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(ml_prediction_duration_seconds_bucket[5m])))",
           "legendFormat": "P99",
           "refId": "C"
         }
@@ -368,7 +368,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(ml_prediction_errors_total[5m])) or vector(0)) / clamp_min(sum(rate(ml_predictions_total[5m])), 0.000001)",
+          "expr": "sum by (error_type) (rate(ml_prediction_errors_total[5m]))",
           "legendFormat": "{{error_type}}",
           "refId": "A"
         }

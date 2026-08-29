@@ -7,10 +7,14 @@ This application exposes:
 - /metrics - Prometheus metrics endpoint
 """
 
+import logging
+import time
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-import logging
+from fastapi.responses import JSONResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.config import (
     API_TITLE, 
@@ -56,7 +60,7 @@ if METRICS_ENABLED:
     app.add_middleware(MetricsMiddleware)
 
 # Global model instance
-model: MovieRatingModel = None
+model: Optional[MovieRatingModel] = None
 
 
 @app.on_event("startup")
@@ -96,11 +100,17 @@ async def health_check():
     
     Returns the health status of the API and whether the model is loaded.
     """
-    return HealthResponse(
-        status="healthy" if model and model.is_loaded() else "unhealthy",
-        model_loaded=model is not None and model.is_loaded(),
-        model_version=MODEL_VERSION
+    model_loaded = model is not None and model.is_loaded()
+    health = HealthResponse(
+        status="healthy" if model_loaded else "unhealthy",
+        model_loaded=model_loaded,
+        model_version=MODEL_VERSION,
     )
+    if not model_loaded:
+        # Docker, load balancers and load tests primarily use the HTTP status.
+        # Returning 200 for an API that cannot predict made readiness checks lie.
+        return JSONResponse(status_code=503, content=health.model_dump())
+    return health
 
 
 # =============================================================================
@@ -191,24 +201,22 @@ async def predict_batch(request: BatchPredictionRequest):
         BATCH_SIZE.observe(len(request.predictions))
 
     try:
-        results = []
-        total_latency = 0
-        
-        for item in request.predictions:
-            rating, latency_ms = model.predict_with_latency(
-                item.user_id, 
-                item.movie_id
-            )
-            total_latency += latency_ms
-            results.append(PredictionResponse(
+        pairs = [(item.user_id, item.movie_id) for item in request.predictions]
+        start_time = time.perf_counter()
+        ratings = model.predict_batch(pairs)
+        total_latency_ms = (time.perf_counter() - start_time) * 1000
+        avg_latency = total_latency_ms / len(ratings)
+
+        results = [
+            PredictionResponse(
                 user_id=item.user_id,
                 movie_id=item.movie_id,
                 predicted_rating=rating,
                 model_version=MODEL_VERSION,
-                latency_ms=round(latency_ms, 3)
-            ))
-        
-        avg_latency = total_latency / len(results) if results else 0
+                latency_ms=round(avg_latency, 3),
+            )
+            for item, rating in zip(request.predictions, ratings)
+        ]
         
         return BatchPredictionResponse(
             predictions=results,
